@@ -10,7 +10,29 @@ export const STATUS_CONFIG = {
 };
 
 export const STATUSES = ["Applied", "Interview", "Waitlisted", "Accepted", "Rejected"];
+export const CUSTOM_STATUS_OPTION = "__custom_status__";
 export const LEVELS = ["Undergrad", "Masters", "PhD", "Postdoc"];
+
+export function getStatusConfig(status = "") {
+  if (STATUS_CONFIG[status]) {
+    return STATUS_CONFIG[status];
+  }
+
+  return {
+    color: "#0f766e",
+    bg: "#ccfbf1",
+    icon: "◌",
+  };
+}
+
+export function getDisplayStatuses(statuses = []) {
+  const normalizedStatuses = [...new Set(statuses.filter(Boolean))];
+  const customStatuses = normalizedStatuses
+    .filter((status) => !STATUSES.includes(status))
+    .sort((left, right) => left.localeCompare(right));
+
+  return [...STATUSES.filter((status) => normalizedStatuses.includes(status)), ...customStatuses];
+}
 
 // ─── Scholarship database ────────────────────────────────────────
 export const SCHOLARSHIPS_DB = scholarshipsDB;

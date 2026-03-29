@@ -1,4 +1,4 @@
-import { LEVELS, STATUSES } from "./constants";
+import { LEVELS } from "./constants";
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/i;
 
@@ -115,13 +115,10 @@ export function sanitizeSubmission(entry = {}) {
     throw new Error("Study level is invalid.");
   }
 
-  if (!STATUSES.includes(sanitized.status)) {
-    throw new Error("Status is invalid.");
-  }
-
   ensureMaxLength(sanitized.scholarship, 160, "Scholarship name");
   ensureMaxLength(sanitized.cycleYear, 32, "Cycle year");
   ensureMaxLength(sanitized.country, 120, "Country");
+  ensureMaxLength(sanitized.status, 40, "Status");
   ensureMaxLength(sanitized.field, 160, "Field of study");
   ensureMaxLength(sanitized.university, 160, "University");
   ensureMaxLength(sanitized.program, 160, "Program");
@@ -132,6 +129,7 @@ export function sanitizeSubmission(entry = {}) {
   ensureNoLinks(sanitized.university, "University");
   ensureNoLinks(sanitized.program, "Program");
   ensureNoLinks(sanitized.applicationRound, "Application round");
+  ensureNoLinks(sanitized.status, "Status");
   ensureNoLinks(sanitized.note, "Notes");
 
   ensureDateValue(sanitized.date, "Latest update date", { required: true });
@@ -196,13 +194,10 @@ export function validateSubmissionDraft(entry = {}, { requiresCaptcha = false, c
     addError(errors, "level", "Study level is invalid.");
   }
 
-  if (normalized.status && !STATUSES.includes(normalized.status)) {
-    addError(errors, "status", "Status is invalid.");
-  }
-
   validateMaxLength(errors, "scholarship", normalized.scholarship, 160, "Scholarship name");
   validateMaxLength(errors, "cycleYear", normalized.cycleYear, 32, "Cycle year");
   validateMaxLength(errors, "country", normalized.country, 120, "Country");
+  validateMaxLength(errors, "status", normalized.status, 40, "Status");
   validateMaxLength(errors, "field", normalized.field, 160, "Field of study");
   validateMaxLength(errors, "university", normalized.university, 160, "University");
   validateMaxLength(errors, "program", normalized.program, 160, "Program");
@@ -214,6 +209,7 @@ export function validateSubmissionDraft(entry = {}, { requiresCaptcha = false, c
   validateNoLinks(errors, "university", normalized.university, "University");
   validateNoLinks(errors, "program", normalized.program, "Program");
   validateNoLinks(errors, "applicationRound", normalized.applicationRound, "Application round");
+  validateNoLinks(errors, "status", normalized.status, "Status");
   validateNoLinks(errors, "note", normalized.note, "Notes");
 
   validateDate(errors, "appliedDate", normalized.appliedDate, "Applied date");

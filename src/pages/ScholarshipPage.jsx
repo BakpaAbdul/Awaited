@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { STATUSES, STATUS_CONFIG } from "../lib/constants";
+import { getStatusConfig } from "../lib/constants";
 import { panelStyle, panelTitle, THEME } from "../lib/theme";
 import { MetadataItem, ResultCard } from "../components/results";
 
@@ -16,7 +16,7 @@ export default function ScholarshipPage({
   onDelete,
   verified,
 }) {
-  const { entries, statusCounts, name, record } = data;
+  const { entries, statusCounts, name, record, displayStatuses } = data;
   const [expandedCard, setExpandedCard] = useState(null);
   const [newComments, setNewComments] = useState({});
   const [visibleCount, setVisibleCount] = useState(SCHOLARSHIP_PAGE_SIZE);
@@ -64,22 +64,22 @@ export default function ScholarshipPage({
             background: THEME.panelBackgroundMuted,
           }}
         >
-          {STATUSES.map((status) =>
+          {displayStatuses.map((status) =>
             statusCounts[status] > 0 ? (
               <div
                 key={status}
                 style={{
                   width: `${(statusCounts[status] / Math.max(total, 1)) * 100}%`,
-                  background: STATUS_CONFIG[status].color,
+                  background: getStatusConfig(status).color,
                 }}
               />
             ) : null,
           )}
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
-          {STATUSES.map((status) => (
+          {displayStatuses.map((status) => (
             <div key={status} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_CONFIG[status].color }} />
+              <span style={{ width: 8, height: 8, borderRadius: "50%", background: getStatusConfig(status).color }} />
               <span style={{ color: THEME.textSecondary }}>{status}:</span>
               <span style={{ color: THEME.textPrimary, fontWeight: 600 }}>{statusCounts[status]}</span>
             </div>

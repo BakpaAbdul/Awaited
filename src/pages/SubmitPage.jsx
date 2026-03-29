@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LEVELS, STATUSES } from "../lib/constants";
+import { CUSTOM_STATUS_OPTION, LEVELS, STATUSES } from "../lib/constants";
 import { buildScholarshipSuggestions, findMatchingScholarshipName, isDatabaseScholarship } from "../lib/scholarships";
 import { hasStoredHumanTrust } from "../lib/humanVerification";
 import { primaryButtonStyle, THEME } from "../lib/theme";
@@ -44,6 +44,7 @@ export default function SubmitPage({
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [submitCount, setSubmitCount] = useState(0);
+  const [useCustomStatus, setUseCustomStatus] = useState(false);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
 
   const errors = useMemo(
@@ -70,6 +71,20 @@ export default function SubmitPage({
   const updateField = (key) => (event) => {
     const value = event.target.value;
     setForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const handleStatusSelect = (event) => {
+    const value = event.target.value;
+    setTouched((current) => ({ ...current, status: true }));
+
+    if (value === CUSTOM_STATUS_OPTION) {
+      setUseCustomStatus(true);
+      setForm((current) => ({ ...current, status: "" }));
+      return;
+    }
+
+    setUseCustomStatus(false);
+    setForm((current) => ({ ...current, status: value }));
   };
 
   const markTouched = (key) => () => {
@@ -268,8 +283,8 @@ export default function SubmitPage({
               {({ fieldId, errorId }) => (
                 <select
                   id={fieldId}
-                  value={form.status}
-                  onChange={updateField("status")}
+                  value={useCustomStatus ? CUSTOM_STATUS_OPTION : form.status}
+                  onChange={handleStatusSelect}
                   onBlur={markTouched("status")}
                   aria-invalid={shouldShowError("status", errors, touched, submitCount)}
                   aria-describedby={errorId}
@@ -283,10 +298,35 @@ export default function SubmitPage({
                       {status}
                     </option>
                   ))}
+                  <option value={CUSTOM_STATUS_OPTION} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>
+                    Other / custom status
+                  </option>
                 </select>
               )}
             </FormField>
           </div>
+
+          {useCustomStatus ? (
+            <FormField
+              label="Custom Status"
+              required
+              error={shouldShowError("status", errors, touched, submitCount) ? errors.status : ""}
+              hint="Use this for statuses like Shortlisted, Nominated, Under Review, or any scholarship-specific update."
+            >
+              {({ fieldId, errorId, hintId }) => (
+                <input
+                  id={fieldId}
+                  value={form.status}
+                  onChange={updateField("status")}
+                  onBlur={markTouched("status")}
+                  placeholder="Type your custom status"
+                  aria-invalid={shouldShowError("status", errors, touched, submitCount)}
+                  aria-describedby={[hintId, errorId].filter(Boolean).join(" ") || undefined}
+                  style={getInputStateStyle(shouldShowError("status", errors, touched, submitCount))}
+                />
+              )}
+            </FormField>
+          ) : null}
 
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <FormField

@@ -10,7 +10,10 @@ create table if not exists public.scholarship_results (
   host_university text check (host_university is null or char_length(trim(host_university)) <= 160),
   program_name text check (program_name is null or char_length(trim(program_name)) <= 160),
   application_round text check (application_round is null or char_length(trim(application_round)) <= 80),
-  status text not null check (status in ('Applied', 'Interview', 'Waitlisted', 'Accepted', 'Rejected')),
+  status text not null check (
+    char_length(trim(status)) between 2 and 40
+    and status !~* '(https?://|www\.)'
+  ),
   decision_date date not null,
   applied_date date,
   interview_date date,

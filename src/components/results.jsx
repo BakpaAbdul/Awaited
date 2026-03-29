@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { STATUS_CONFIG } from "../lib/constants";
+import { getStatusConfig, STATUS_CONFIG } from "../lib/constants";
 import { inputStyle, panelStyle, panelTitle, primaryButtonStyle, THEME } from "../lib/theme";
 import { hasStoredHumanTrust } from "../lib/humanVerification";
 import { turnstileSiteKey } from "../lib/supabaseClient";
 import { TurnstileGate } from "./formControls";
 
 export function StatusBadge({ status }) {
+  const config = getStatusConfig(status);
   return (
     <span
       style={{
@@ -16,13 +17,13 @@ export function StatusBadge({ status }) {
         minWidth: 122,
         padding: "7px 16px",
         borderRadius: 999,
-        background: `${STATUS_CONFIG[status].color}18`,
-        color: STATUS_CONFIG[status].color,
+        background: config.bg,
+        color: config.color,
         fontSize: 13,
         fontWeight: 800,
       }}
     >
-      <span>{STATUS_CONFIG[status].icon}</span>
+      <span>{config.icon}</span>
       {status}
     </span>
   );

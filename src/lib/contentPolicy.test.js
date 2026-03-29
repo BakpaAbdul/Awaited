@@ -23,4 +23,15 @@ describe("validateSubmissionDraft", () => {
 
     expect(errors.interviewDate).toContain("earlier than applied date");
   });
+
+  it("allows a custom status label", () => {
+    const errors = validateSubmissionDraft({
+      scholarship: "Chevening Scholarship",
+      country: "United Kingdom",
+      status: "Shortlisted",
+      date: "2026-03-10",
+    });
+
+    expect(errors.status).toBeUndefined();
+  });
 });

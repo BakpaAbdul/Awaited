@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 import { appDataStore, DATA_BACKEND_MODE } from "./lib/appDataStore";
+import { getDisplayStatuses } from "./lib/constants";
 import { applyDocumentSeo, getRouteSeo } from "./lib/seo";
 import { parseAppRoute, pushAppRoute } from "./lib/router";
 import { DATABASE_SCHOLARSHIP_NAMES, findMatchingScholarshipName, findScholarshipNameBySlug, getCanonicalScholarshipName, getScholarshipRecord, getScholarshipRecordBySlug, isDatabaseScholarship, scholarshipToSlug, sortScholarshipNames } from "./lib/scholarships";
@@ -198,15 +199,15 @@ export default function AwaitedApp() {
     }
 
     const entries = (isAdmin ? results : visibleResults).filter((result) => result.scholarship === selectedScholarship);
+    const approvedEntries = entries.filter((entry) => entry.reviewState === "approved" && !entry.hidden);
     const statusCounts = {};
-    ["Applied", "Interview", "Waitlisted", "Accepted", "Rejected"].forEach((status) => {
-      statusCounts[status] = entries.filter(
-        (entry) => entry.status === status && entry.reviewState === "approved" && !entry.hidden,
-      ).length;
+    getDisplayStatuses(approvedEntries.map((entry) => entry.status)).forEach((status) => {
+      statusCounts[status] = approvedEntries.filter((entry) => entry.status === status).length;
     });
 
     return {
       entries,
+      displayStatuses: getDisplayStatuses(approvedEntries.map((entry) => entry.status)),
       statusCounts,
       name: selectedScholarship,
       record: getScholarshipRecord(selectedScholarship),

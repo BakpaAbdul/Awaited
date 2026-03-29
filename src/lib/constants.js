@@ -18,6 +18,28 @@ export function getStatusConfig(status = "") {
     return STATUS_CONFIG[status];
   }
 
+  const normalizedStatus = status.trim().toLowerCase();
+
+  if (/(accepted|approved|awarded|selected|winner|granted|admitted|offer)/i.test(normalizedStatus)) {
+    return { color: "#059669", bg: "#D1FAE5", icon: "●" };
+  }
+
+  if (/(rejected|denied|unsuccessful|declined|not selected|failed)/i.test(normalizedStatus)) {
+    return { color: "#DC2626", bg: "#FEE2E2", icon: "✕" };
+  }
+
+  if (/(interview|shortlist|shortlisted|nominated|nomination|finalist)/i.test(normalizedStatus)) {
+    return { color: "#D97706", bg: "#FEF3C7", icon: "◎" };
+  }
+
+  if (/(wait|reserve|alternate|holding)/i.test(normalizedStatus)) {
+    return { color: "#7C3AED", bg: "#EDE9FE", icon: "◑" };
+  }
+
+  if (/(review|screening|processing|assessment|evaluation|checking)/i.test(normalizedStatus)) {
+    return { color: "#2563EB", bg: "#DBEAFE", icon: "◌" };
+  }
+
   return {
     color: "#0f766e",
     bg: "#ccfbf1",

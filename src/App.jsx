@@ -180,14 +180,6 @@ export default function AwaitedApp() {
     [results],
   );
 
-  const stats = useMemo(() => {
-    const nextStats = { total: approvedVisibleResults.length };
-    ["Applied", "Interview", "Waitlisted", "Accepted", "Rejected"].forEach((status) => {
-      nextStats[status] = approvedVisibleResults.filter((result) => result.status === status).length;
-    });
-    return nextStats;
-  }, [approvedVisibleResults]);
-
   const selectedScholarship = useMemo(() => {
     if (resolvedView !== "scholarship") {
       return null;
@@ -745,7 +737,6 @@ export default function AwaitedApp() {
               onToggleHideResult={(id, hidden) => applyStoreMutation(() => appDataStore.setResultHidden(id, hidden))}
               onDeleteResult={(id) => applyStoreMutation(() => appDataStore.deleteResult(id))}
               isVerifiedScholarship={isVerifiedScholarship}
-              stats={stats}
             />
           ) : null}
 

@@ -1,10 +1,11 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { LEVELS, STATUSES, STATUS_CONFIG } from "../lib/constants";
+import { LEVELS } from "../lib/constants";
 import { inputStyle, THEME } from "../lib/theme";
 import { ResultCard } from "../components/results";
-import { EmptyFeedState, FilterSelect, StatChip, TrustNotice } from "../components/siteChrome";
+import { EmptyFeedState, FilterSelect, TrustNotice } from "../components/siteChrome";
 
 const RESULTS_PAGE_SIZE = 18;
+const POPULAR_SCHOLARSHIP_LIMIT = 8;
 
 export default function FeedPage({
   visibleResults,
@@ -16,10 +17,8 @@ export default function FeedPage({
   onToggleHideResult,
   onDeleteResult,
   isVerifiedScholarship,
-  stats,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterStatus, setFilterStatus] = useState("All");
   const [filterLevel, setFilterLevel] = useState("All");
   const [filterCountry, setFilterCountry] = useState("All");
   const [expandedCard, setExpandedCard] = useState(null);
@@ -31,8 +30,17 @@ export default function FeedPage({
     () => [...new Set(visibleResults.map((result) => result.country))].sort(),
     [visibleResults],
   );
-  const scholarships = useMemo(
-    () => [...new Set(visibleResults.map((result) => result.scholarship))].sort(),
+
+  const popularScholarships = useMemo(
+    () =>
+      Object.entries(
+        visibleResults.reduce((accumulator, result) => {
+          accumulator[result.scholarship] = (accumulator[result.scholarship] || 0) + 1;
+          return accumulator;
+        }, {}),
+      )
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
+        .slice(0, POPULAR_SCHOLARSHIP_LIMIT),
     [visibleResults],
   );
 
@@ -49,37 +57,22 @@ export default function FeedPage({
           result.university.toLowerCase().includes(query) ||
           result.program.toLowerCase().includes(query) ||
           result.applicationRound.toLowerCase().includes(query);
-        const matchStatus = filterStatus === "All" || result.status === filterStatus;
         const matchLevel = filterLevel === "All" || result.level === filterLevel;
         const matchCountry = filterCountry === "All" || result.country === filterCountry;
-        return matchSearch && matchStatus && matchLevel && matchCountry;
+        return matchSearch && matchLevel && matchCountry;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [visibleResults, deferredQuery, filterStatus, filterLevel, filterCountry]);
+  }, [visibleResults, deferredQuery, filterLevel, filterCountry]);
 
   useEffect(() => {
     setVisibleCount(RESULTS_PAGE_SIZE);
-  }, [deferredQuery, filterStatus, filterLevel, filterCountry]);
+  }, [deferredQuery, filterLevel, filterCountry]);
 
   const visibleSlice = filtered.slice(0, visibleCount);
 
   return (
     <>
       <TrustNotice onNavigate={onNavigate} />
-
-      <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
-        <StatChip label="Total Reports" value={stats.total} color="#94A3B8" />
-        {STATUSES.map((status) => (
-          <StatChip
-            key={status}
-            label={status}
-            value={stats[status]}
-            color={STATUS_CONFIG[status].color}
-            onClick={() => setFilterStatus(filterStatus === status ? "All" : status)}
-            active={filterStatus === status}
-          />
-        ))}
-      </div>
 
       <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
         <input
@@ -105,12 +98,7 @@ export default function FeedPage({
       </div>
 
       <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-        {scholarships.map((name) => {
-          const count = visibleResults.filter((result) => result.scholarship === name).length;
-          if (count === 0 && !isAdmin) {
-            return null;
-          }
-
+        {popularScholarships.map(([name, count]) => {
           return (
             <button
               key={name}

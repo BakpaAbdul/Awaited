@@ -16,6 +16,7 @@ if (!supabaseUrl || !serviceRoleKey) {
 const adminClient = createClient(supabaseUrl, serviceRoleKey, {
   auth: { persistSession: false },
 });
+const HUMAN_TRUST_HOURS = 12;
 
 function jsonResponse(payload: Record<string, unknown>, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -113,6 +114,57 @@ async function countRecentRows(table: string, fingerprintHash: string, isoThresh
   return count || 0;
 }
 
+async function lookupHumanTrustSession(trustToken: string, fingerprintHash: string) {
+  const tokenHash = await sha256(trustToken);
+  const nowIso = new Date().toISOString();
+  const { data, error } = await adminClient
+    .from("human_verification_sessions")
+    .select("id, expires_at")
+    .eq("token_hash", tokenHash)
+    .eq("fingerprint_hash", fingerprintHash)
+    .gt("expires_at", nowIso)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data?.id) {
+    return null;
+  }
+
+  await adminClient
+    .from("human_verification_sessions")
+    .update({ last_used_at: nowIso })
+    .eq("id", data.id);
+
+  return {
+    trustToken,
+    trustExpiresAt: data.expires_at,
+  };
+}
+
+async function createHumanTrustSession(fingerprintHash: string) {
+  const rawToken = crypto.randomUUID();
+  const tokenHash = await sha256(rawToken);
+  const expiresAt = new Date(Date.now() + HUMAN_TRUST_HOURS * 60 * 60 * 1000).toISOString();
+
+  const { error } = await adminClient.from("human_verification_sessions").insert({
+    token_hash: tokenHash,
+    fingerprint_hash: fingerprintHash,
+    expires_at: expiresAt,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return {
+    trustToken: rawToken,
+    trustExpiresAt: expiresAt,
+  };
+}
+
 async function ensureUniqueSlug(table: string, title: string) {
   const baseSlug = contentToSlug(title) || `${table}-${Date.now()}`;
   let nextSlug = baseSlug;
@@ -147,18 +199,28 @@ async function isKnownScholarship(name: string) {
   return Boolean(data?.name);
 }
 
-async function ensureHuman(meta: Record<string, unknown>, request: Request) {
+async function ensureHuman(meta: Record<string, unknown>, request: Request, fingerprintHash: string) {
   const honeypot = cleanText(meta.honeypot);
   const captchaToken = cleanText(meta.captchaToken);
+  const trustToken = cleanText(meta.trustToken);
 
   if (honeypot) {
     throw new Error("Spam submission blocked.");
+  }
+
+  if (trustToken) {
+    const trustedSession = await lookupHumanTrustSession(trustToken, fingerprintHash);
+    if (trustedSession) {
+      return trustedSession;
+    }
   }
 
   const verified = await verifyTurnstile(captchaToken, getClientIp(request));
   if (!verified) {
     throw new Error("Human verification failed.");
   }
+
+  return createHumanTrustSession(fingerprintHash);
 }
 
 async function buildFingerprintHash(meta: Record<string, unknown>, request: Request) {
@@ -239,9 +301,8 @@ async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<s
   ensure(status, "Status", 40);
   ensure(decisionDate, "Decision date", 32);
 
-  await ensureHuman(meta, request);
-
   const fingerprintHash = await buildFingerprintHash(meta, request);
+  const humanTrust = await ensureHuman(meta, request, fingerprintHash);
   const recentWindow = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
   const recentResultCount = await countRecentRows("scholarship_results", fingerprintHash, recentWindow);
 
@@ -275,14 +336,13 @@ async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<s
     ok: true,
     reviewState: moderation.reviewState,
     moderationReason: moderation.moderationReason,
+    ...humanTrust,
   });
 }
 
 async function handleAddComment(resultId: number, text: string, meta: Record<string, unknown>, request: Request) {
   const cleanComment = cleanText(text);
   ensure(cleanComment, "Comment", 400);
-
-  await ensureHuman(meta, request);
 
   const { data: targetResult, error: resultError } = await adminClient
     .from("scholarship_results")
@@ -299,6 +359,7 @@ async function handleAddComment(resultId: number, text: string, meta: Record<str
   }
 
   const fingerprintHash = await buildFingerprintHash(meta, request);
+  const humanTrust = await ensureHuman(meta, request, fingerprintHash);
   const recentWindow = new Date(Date.now() - 30 * 60 * 1000).toISOString();
   const recentCommentCount = await countRecentRows("scholarship_comments", fingerprintHash, recentWindow);
 
@@ -324,6 +385,7 @@ async function handleAddComment(resultId: number, text: string, meta: Record<str
     ok: true,
     reviewState: moderation.reviewState,
     moderationReason: moderation.moderationReason,
+    ...humanTrust,
   });
 }
 
@@ -334,9 +396,8 @@ async function handleCreateForumThread(entry: Record<string, unknown>, meta: Rec
   ensure(title, "Thread title", 160);
   ensure(body, "Thread body", 2400);
 
-  await ensureHuman(meta, request);
-
   const fingerprintHash = await buildFingerprintHash(meta, request);
+  const humanTrust = await ensureHuman(meta, request, fingerprintHash);
   const recentWindow = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
   const recentThreadCount = await countRecentRows("forum_threads", fingerprintHash, recentWindow);
 
@@ -365,14 +426,13 @@ async function handleCreateForumThread(entry: Record<string, unknown>, meta: Rec
     slug,
     reviewState: moderation.reviewState,
     moderationReason: moderation.moderationReason,
+    ...humanTrust,
   });
 }
 
 async function handleAddForumReply(threadId: number, text: string, meta: Record<string, unknown>, request: Request) {
   const body = cleanText(text);
   ensure(body, "Reply", 1200);
-
-  await ensureHuman(meta, request);
 
   const { data: targetThread, error: threadError } = await adminClient
     .from("forum_threads")
@@ -389,6 +449,7 @@ async function handleAddForumReply(threadId: number, text: string, meta: Record<
   }
 
   const fingerprintHash = await buildFingerprintHash(meta, request);
+  const humanTrust = await ensureHuman(meta, request, fingerprintHash);
   const recentWindow = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentReplyCount = await countRecentRows("forum_replies", fingerprintHash, recentWindow);
 
@@ -414,6 +475,7 @@ async function handleAddForumReply(threadId: number, text: string, meta: Record<
     ok: true,
     reviewState: moderation.reviewState,
     moderationReason: moderation.moderationReason,
+    ...humanTrust,
   });
 }
 

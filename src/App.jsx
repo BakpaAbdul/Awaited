@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AdminBlogPanel, BlogIndex, BlogPostView, ForumIndex, ForumThreadView } from "./components/communitySections";
 import { LEVELS, STATUSES, STATUS_CONFIG } from "./lib/constants";
 import { appDataStore, DATA_BACKEND_MODE } from "./lib/appDataStore";
+import { hasStoredHumanTrust } from "./lib/humanVerification";
 import { parseAppRoute, pushAppRoute } from "./lib/router";
 import { loadTurnstileScript } from "./lib/turnstile";
 import { turnstileSiteKey } from "./lib/supabaseClient";
@@ -1535,6 +1536,7 @@ function ResultCard({
   const [honeypot, setHoneypot] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
 
   const handleSendComment = async () => {
     const resultMeta = await onCommentSubmit(commentText, {
@@ -1608,8 +1610,8 @@ function ResultCard({
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
               <input type="text" placeholder="Add a comment anonymously..." value={commentText} onChange={(event) => onCommentChange(event.target.value)} onKeyDown={(event) => event.key === "Enter" && handleSendComment()} style={{ ...inputStyle, padding: "8px 14px" }} />
               <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
-              {turnstileSiteKey && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
-              <button onClick={handleSendComment} style={{ ...primaryButtonStyle, width: "auto", alignSelf: "flex-end", padding: "8px 16px", fontSize: 12 }} disabled={turnstileSiteKey ? !captchaToken : !commentText.trim()}>
+              {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
+              <button onClick={handleSendComment} style={{ ...primaryButtonStyle, width: "auto", alignSelf: "flex-end", padding: "8px 16px", fontSize: 12 }} disabled={requiresCaptcha ? !captchaToken : !commentText.trim()}>
                 Send
               </button>
             </div>
@@ -1636,6 +1638,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
   const [honeypot, setHoneypot] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
   const trimmedScholarship = form.scholarship.trim();
   const exactKnownMatch = findMatchingScholarshipName(trimmedScholarship, [...verifiedScholarships, ...customScholarships]);
   const exactDatabaseMatch = isDatabaseScholarship(trimmedScholarship);
@@ -1650,7 +1653,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
     }
   };
 
-  const valid = form.scholarship.trim() && form.country.trim() && form.field.trim() && (!turnstileSiteKey || captchaToken);
+  const valid = form.scholarship.trim() && form.country.trim() && form.field.trim() && (!requiresCaptcha || captchaToken);
 
   const handleSubmit = async () => {
     if (!valid) {
@@ -1746,7 +1749,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
           </FormField>
 
           <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
-          {turnstileSiteKey && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
+          {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
 
           <button onClick={handleSubmit} disabled={!valid} style={primaryButtonStyle}>Submit Anonymously</button>
         </div>
@@ -1944,7 +1947,7 @@ function TurnstileGate({ onVerify, resetKey }) {
   const widgetIdRef = useRef(null);
 
   useEffect(() => {
-    if (!turnstileSiteKey || !containerRef.current) {
+    if (!turnstileSiteKey || hasStoredHumanTrust() || !containerRef.current) {
       return undefined;
     }
 
@@ -1976,7 +1979,7 @@ function TurnstileGate({ onVerify, resetKey }) {
     };
   }, [onVerify, resetKey]);
 
-  if (!turnstileSiteKey) {
+  if (!turnstileSiteKey || hasStoredHumanTrust()) {
     return null;
   }
 

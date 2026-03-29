@@ -1,6 +1,7 @@
 import { getDefaultAppData, loadPersistedAppData, normalizeAppData, persistAppData } from "./persistence";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { getClientFingerprint } from "./clientIdentity";
+import { clearHumanTrust, getStoredHumanTrustToken, storeHumanTrust } from "./humanVerification";
 import { buildExcerpt, contentToSlug } from "./content";
 import { sanitizeBlogPost, sanitizeComment, sanitizeForumReply, sanitizeForumThread, sanitizeScholarshipName, sanitizeSubmission } from "./contentPolicy";
 import {
@@ -179,6 +180,22 @@ async function invokeFunction(functionName, body, { withAuth = false } = {}) {
   }
 
   return data;
+}
+
+function syncHumanTrustFromResponse(response) {
+  if (response?.trustToken && response?.trustExpiresAt) {
+    storeHumanTrust({
+      token: response.trustToken,
+      expiresAt: response.trustExpiresAt,
+    });
+  }
+}
+
+function maybeClearHumanTrustOnError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  if (message.toLowerCase().includes("human verification failed")) {
+    clearHumanTrust();
+  }
 }
 
 async function loadSupabaseAppData({ admin = false } = {}) {
@@ -409,10 +426,15 @@ async function submitResult(entry, moderation = {}, options = {}) {
         fingerprint: getClientFingerprint(),
         honeypot: moderation.honeypot || "",
         captchaToken: moderation.captchaToken || "",
+        trustToken: getStoredHumanTrustToken(),
       },
     },
     { withAuth: false },
-  );
+  ).catch((error) => {
+    maybeClearHumanTrustOnError(error);
+    throw error;
+  });
+  syncHumanTrustFromResponse(response);
 
   return {
     appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
@@ -465,10 +487,15 @@ async function addComment(resultId, text, moderation = {}, options = {}) {
         fingerprint: getClientFingerprint(),
         honeypot: moderation.honeypot || "",
         captchaToken: moderation.captchaToken || "",
+        trustToken: getStoredHumanTrustToken(),
       },
     },
     { withAuth: false },
-  );
+  ).catch((error) => {
+    maybeClearHumanTrustOnError(error);
+    throw error;
+  });
+  syncHumanTrustFromResponse(response);
 
   return {
     appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
@@ -520,10 +547,15 @@ async function createForumThread(entry, moderation = {}, options = {}) {
         fingerprint: getClientFingerprint(),
         honeypot: moderation.honeypot || "",
         captchaToken: moderation.captchaToken || "",
+        trustToken: getStoredHumanTrustToken(),
       },
     },
     { withAuth: false },
-  );
+  ).catch((error) => {
+    maybeClearHumanTrustOnError(error);
+    throw error;
+  });
+  syncHumanTrustFromResponse(response);
 
   return {
     appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
@@ -576,10 +608,15 @@ async function addForumReply(threadId, text, moderation = {}, options = {}) {
         fingerprint: getClientFingerprint(),
         honeypot: moderation.honeypot || "",
         captchaToken: moderation.captchaToken || "",
+        trustToken: getStoredHumanTrustToken(),
       },
     },
     { withAuth: false },
-  );
+  ).catch((error) => {
+    maybeClearHumanTrustOnError(error);
+    throw error;
+  });
+  syncHumanTrustFromResponse(response);
 
   return {
     appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),

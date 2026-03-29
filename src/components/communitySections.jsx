@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildExcerpt } from "../lib/content";
+import { hasStoredHumanTrust } from "../lib/humanVerification";
 import { loadTurnstileScript } from "../lib/turnstile";
 import { turnstileSiteKey } from "../lib/supabaseClient";
 
@@ -39,7 +40,7 @@ function TurnstileGate({ onVerify, resetKey }) {
   const widgetIdRef = useRef(null);
 
   useEffect(() => {
-    if (!turnstileSiteKey || !containerRef.current) {
+    if (!turnstileSiteKey || hasStoredHumanTrust() || !containerRef.current) {
       return undefined;
     }
 
@@ -71,7 +72,7 @@ function TurnstileGate({ onVerify, resetKey }) {
     };
   }, [onVerify, resetKey]);
 
-  if (!turnstileSiteKey) {
+  if (!turnstileSiteKey || hasStoredHumanTrust()) {
     return null;
   }
 
@@ -174,6 +175,7 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
 
   const visibleThreads = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -217,13 +219,13 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Thread title" style={inputStyle} />
           <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="What do you want to ask or discuss?" rows={5} style={{ ...inputStyle, resize: "vertical" }} />
           <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
-          {turnstileSiteKey && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
+          {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ fontSize: 12, color: "#64748B" }}>Forum posts are anonymous and can be queued for moderation if they look risky.</div>
             <button
               onClick={handleCreate}
-              disabled={!title.trim() || !body.trim() || (turnstileSiteKey && !captchaToken)}
-              style={{ ...primaryButtonStyle, opacity: !title.trim() || !body.trim() || (turnstileSiteKey && !captchaToken) ? 0.6 : 1 }}
+              disabled={!title.trim() || !body.trim() || (requiresCaptcha && !captchaToken)}
+              style={{ ...primaryButtonStyle, opacity: !title.trim() || !body.trim() || (requiresCaptcha && !captchaToken) ? 0.6 : 1 }}
             >
               Create Thread
             </button>
@@ -277,6 +279,7 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const visibleReplies = isAdmin ? thread.replies : thread.replies.filter((reply) => reply.reviewState === "approved");
+  const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
 
   const handleReply = async () => {
     const created = await onReplySubmit(
@@ -340,12 +343,12 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} rows={4} placeholder="Share your experience or answer the question..." style={{ ...inputStyle, resize: "vertical" }} />
             <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
-            {turnstileSiteKey && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
+            {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleReply}
-                disabled={!replyText.trim() || (turnstileSiteKey && !captchaToken)}
-                style={{ ...primaryButtonStyle, opacity: !replyText.trim() || (turnstileSiteKey && !captchaToken) ? 0.6 : 1 }}
+                disabled={!replyText.trim() || (requiresCaptcha && !captchaToken)}
+                style={{ ...primaryButtonStyle, opacity: !replyText.trim() || (requiresCaptcha && !captchaToken) ? 0.6 : 1 }}
               >
                 Post Reply
               </button>

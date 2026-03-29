@@ -1,8 +1,8 @@
-# ScholarTrack
+# Awaited
 
 **A GradCafe-style anonymous scholarship results tracker.**
 
-Scholarship timelines are opaque. Applicants have no way to know whether decisions have been sent out, whether silence means rejection, or whether others with similar profiles got through. ScholarTrack fixes that.
+Scholarship timelines are opaque. Applicants have no way to know whether decisions have been sent out, whether silence means rejection, or whether others with similar profiles got through. Awaited fixes that.
 
 Users anonymously report their scholarship application outcomes (Applied → Interview → Waitlisted → Accepted/Rejected), and others can browse and search that data to gauge timelines and chances.
 
@@ -46,8 +46,8 @@ Users anonymously report their scholarship application outcomes (Applied → Int
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/scholartrack.git
-cd scholartrack
+git clone https://github.com/YOUR_USERNAME/awaited.git
+cd awaited
 
 # 2. Install dependencies
 npm install
@@ -68,7 +68,7 @@ Click the **Admin** button in the top-right corner and enter the password: `scho
 ## Project Structure
 
 ```
-scholartrack/
+awaited/
 ├── public/
 │   └── favicon.svg
 ├── src/
@@ -108,7 +108,7 @@ scholartrack/
 ### Phase 3 — Deploy
 - [ ] Connect GitHub repo to Vercel
 - [ ] Configure environment variables on Vercel
-- [ ] Set up custom domain (scholartrack.org or similar)
+- [ ] Set up custom domain (awaited.org or similar)
 
 ### Phase 4 — Growth Features
 - [ ] Email notifications for specific scholarships
@@ -122,7 +122,7 @@ scholartrack/
 
 ## Contributing
 
-ScholarTrack will be open-sourced once the core is stable. If you're interested in contributing, watch this repo for updates.
+Awaited will be open-sourced once the core is stable. If you're interested in contributing, watch this repo for updates.
 
 ---
 

@@ -39,7 +39,7 @@ const SEED_RESULTS = [
 ];
 
 // ─── Main App ────────────────────────────────────────────────────────────────
-export default function ScholarTrack() {
+export default function AwaitedApp() {
   const [results, setResults] = useState(SEED_RESULTS);
   const [verifiedList, setVerifiedList] = useState(INITIAL_VERIFIED);
   const [view, setView] = useState("feed");
@@ -155,7 +155,7 @@ export default function ScholarTrack() {
       {/* Header */}
       <header style={{ padding: "20px 28px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, cursor: "pointer" }} onClick={goFeed}>
-          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, background: "linear-gradient(135deg, #38BDF8, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>ScholarTrack</span>
+          <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, background: "linear-gradient(135deg, #38BDF8, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Awaited</span>
           <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}>Beta</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

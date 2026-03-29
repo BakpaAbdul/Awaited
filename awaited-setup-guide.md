@@ -1,21 +1,21 @@
-# ScholarTrack — Setup Guide
+# Awaited — Setup Guide
 ## From Download to GitHub to Live Site
 
 ---
 
 ## Step 1: Download & Extract the Project
 
-After downloading `scholartrack-project.tar.gz` from this chat:
+After downloading `awaited-project.tar.gz` from this chat:
 
 ```bash
 # Move to where you want the project (e.g., your home folder or Desktop)
 cd ~/Desktop
 
 # Extract the archive
-tar -xzf scholartrack-project.tar.gz
+tar -xzf awaited-project.tar.gz
 
 # Enter the project folder
-cd scholartrack
+cd awaited
 ```
 
 ---
@@ -30,7 +30,7 @@ npm install
 npm run dev
 ```
 
-Open your browser to `http://localhost:5173` — you should see ScholarTrack running.
+Open your browser to `http://localhost:5173` — you should see Awaited running.
 
 Test the admin panel: click "Admin" in the top-right → enter password: `scholar2026`
 
@@ -44,7 +44,7 @@ Press `Ctrl+C` in the terminal to stop the server when done.
 
 1. Go to https://github.com/new
 2. Fill in:
-   - **Repository name**: `scholartrack`
+   - **Repository name**: `awaited`
    - **Description**: `A GradCafe-style anonymous scholarship results tracker`
    - **Visibility**: Private (for now — you can make it public later)
    - Do NOT check "Add a README" (we already have one)
@@ -55,14 +55,14 @@ Press `Ctrl+C` in the terminal to stop the server when done.
 
 ```bash
 # If you have the GitHub CLI installed:
-gh repo create scholartrack --private --source=. --remote=origin
+gh repo create awaited --private --source=. --remote=origin
 ```
 
 ---
 
 ## Step 4: Push Your Code to GitHub
 
-Run these commands from inside the `scholartrack/` folder:
+Run these commands from inside the `awaited/` folder:
 
 ```bash
 # Initialize git
@@ -72,13 +72,13 @@ git init
 git add .
 
 # Make your first commit
-git commit -m "Initial commit: ScholarTrack MVP with admin panel"
+git commit -m "Initial commit: Awaited MVP with admin panel"
 
 # Set the main branch
 git branch -M main
 
 # Connect to your GitHub repo (replace YOUR_USERNAME)
-git remote add origin https://github.com/YOUR_USERNAME/scholartrack.git
+git remote add origin https://github.com/YOUR_USERNAME/awaited.git
 
 # Push!
 git push -u origin main
@@ -92,12 +92,12 @@ Refresh your GitHub repo page — you should see all your files there.
 
 1. Go to https://vercel.com and sign up with your GitHub account
 2. Click **"Add New Project"**
-3. Find and select your `scholartrack` repository
+3. Find and select your `awaited` repository
 4. Vercel will auto-detect it's a Vite project. Leave all settings as default.
 5. Click **Deploy**
 
 In about 30-60 seconds, your site will be live at:
-`https://scholartrack-YOUR_USERNAME.vercel.app`
+`https://awaited-YOUR_USERNAME.vercel.app`
 
 **From now on, every time you `git push`, Vercel automatically redeploys.**
 
@@ -106,7 +106,7 @@ In about 30-60 seconds, your site will be live at:
 ## Step 6: (Optional) Custom Domain
 
 1. Buy a domain from Namecheap, Porkbun, or Google Domains
-   - Suggestions: `scholartrack.org`, `scholartrack.app`, `scholartrack.io`
+   - Suggestions: `awaited.org`, `awaited.app`, `awaited.io`
    - Typical cost: $10-15/year
 
 2. In Vercel dashboard → your project → Settings → Domains

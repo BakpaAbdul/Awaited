@@ -21,6 +21,7 @@ const INITIAL_ROUTE =
   typeof window !== "undefined"
     ? parseAppRoute(window.location.pathname)
     : { view: "feed", scholarshipSlug: null };
+const ADMIN_ENTRY_STORAGE_KEY = "awaited:admin-entry:v1";
 
 const TRUST_PAGES = {
   privacy: {
@@ -125,8 +126,37 @@ const TRUST_PAGES = {
   },
 };
 
+function getStoredAdminEntryAccess() {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return false;
+  }
+
+  try {
+    return window.localStorage.getItem(ADMIN_ENTRY_STORAGE_KEY) === "enabled";
+  } catch {
+    return false;
+  }
+}
+
+function setStoredAdminEntryAccess(enabled) {
+  if (typeof window === "undefined" || !window.localStorage) {
+    return;
+  }
+
+  try {
+    if (enabled) {
+      window.localStorage.setItem(ADMIN_ENTRY_STORAGE_KEY, "enabled");
+    } else {
+      window.localStorage.removeItem(ADMIN_ENTRY_STORAGE_KEY);
+    }
+  } catch {
+    // Ignore localStorage failures and keep the session behavior in memory.
+  }
+}
+
 export default function AwaitedApp() {
   const flashTimerRef = useRef(null);
+  const hiddenAdminTapRef = useRef({ count: 0, lastTap: 0 });
   const [appData, setAppData] = useState(() => appDataStore.getInitialAppData());
   const [activeDataMode, setActiveDataMode] = useState(DATA_BACKEND_MODE);
   const [isHydrating, setIsHydrating] = useState(DATA_BACKEND_MODE === "supabase");
@@ -148,8 +178,10 @@ export default function AwaitedApp() {
   const [adminAuthError, setAdminAuthError] = useState("");
   const [adminTab, setAdminTab] = useState("moderation");
   const [newVerified, setNewVerified] = useState("");
+  const [adminEntryUnlocked, setAdminEntryUnlocked] = useState(() => getStoredAdminEntryAccess());
 
   const isAdmin = Boolean(adminUser);
+  const canAccessAdminEntry = isAdmin || adminEntryUnlocked;
   const results = appData.results;
   const manualVerifiedList = appData.verifiedList;
   const customScholarships = appData.customScholarships || [];
@@ -244,6 +276,12 @@ export default function AwaitedApp() {
   }, [view, routeScholarshipSlug, allScholarshipNames]);
 
   useEffect(() => {
+    if (!canAccessAdminEntry && (view === "login" || view === "admin")) {
+      applyRoute("feed");
+    }
+  }, [canAccessAdminEntry, view]);
+
+  useEffect(() => {
     if (typeof document === "undefined") {
       return;
     }
@@ -277,6 +315,37 @@ export default function AwaitedApp() {
       window.clearTimeout(flashTimerRef.current);
     }
     flashTimerRef.current = window.setTimeout(() => setFlashMessage(""), 3200);
+  };
+
+  const unlockAdminEntry = () => {
+    setStoredAdminEntryAccess(true);
+    setAdminEntryUnlocked(true);
+    showFlash("Admin entry enabled on this browser.");
+    applyRoute("login");
+  };
+
+  const handleBetaTap = (event) => {
+    event.stopPropagation();
+
+    if (isAdmin || adminEntryUnlocked) {
+      return;
+    }
+
+    const now = Date.now();
+    const thresholdMs = 3500;
+    const nextCount = now - hiddenAdminTapRef.current.lastTap <= thresholdMs
+      ? hiddenAdminTapRef.current.count + 1
+      : 1;
+
+    hiddenAdminTapRef.current = {
+      count: nextCount,
+      lastTap: now,
+    };
+
+    if (nextCount >= 5) {
+      hiddenAdminTapRef.current = { count: 0, lastTap: 0 };
+      unlockAdminEntry();
+    }
   };
 
   const applyRoute = (nextView, { scholarshipName = null } = {}) => {
@@ -533,7 +602,11 @@ export default function AwaitedApp() {
     });
   };
 
-  const resolvedView = view === "admin" && !isAdmin ? "login" : view;
+  const requestedView = view === "admin" && !isAdmin ? "login" : view;
+  const resolvedView =
+    !canAccessAdminEntry && (requestedView === "login" || requestedView === "admin")
+      ? "feed"
+      : requestedView;
   const trustPage = TRUST_PAGES[resolvedView] || null;
 
   return (
@@ -549,7 +622,12 @@ export default function AwaitedApp() {
       <header style={{ padding: "20px 28px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, cursor: "pointer" }} onClick={() => applyRoute("feed")}>
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, background: "linear-gradient(135deg, #38BDF8, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Awaited</span>
-          <span style={{ fontSize: 11, color: "#64748B", fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}>Beta</span>
+          <span
+            onClick={handleBetaTap}
+            style={{ fontSize: 11, color: "#64748B", fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}
+          >
+            Beta
+          </span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <NavBtn active={resolvedView === "feed"} onClick={() => applyRoute("feed")}>Browse</NavBtn>
@@ -559,9 +637,9 @@ export default function AwaitedApp() {
               <NavBtn active={resolvedView === "admin"} onClick={() => applyRoute("admin")} admin>⚙ Admin</NavBtn>
               <button onClick={handleAdminLogout} style={{ background: "none", border: "none", color: "#64748B", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Logout</button>
             </>
-          ) : (
+          ) : canAccessAdminEntry ? (
             <button onClick={() => applyRoute("login")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, color: "#475569", fontSize: 11, cursor: "pointer", padding: "6px 12px" }}>Admin</button>
-          )}
+          ) : null}
         </div>
       </header>
 
@@ -637,9 +715,6 @@ export default function AwaitedApp() {
               />
               {adminAuthError && <div style={{ color: "#FCA5A5", fontSize: 12, marginBottom: 12 }}>{adminAuthError}</div>}
               <button onClick={handleAdminLogin} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #6366F1, #818CF8)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Enter Admin</button>
-              <div style={{ fontSize: 11, color: "#475569", marginTop: 14 }}>
-                Default admin account for this deployment: <strong>admin@awaited.local</strong>
-              </div>
               <button onClick={() => applyRoute("feed")} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", marginTop: 12 }}>Cancel</button>
             </div>
           </div>

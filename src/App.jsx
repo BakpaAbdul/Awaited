@@ -463,7 +463,11 @@ export default function AwaitedApp() {
           !query ||
           result.scholarship.toLowerCase().includes(query) ||
           result.country.toLowerCase().includes(query) ||
-          result.field.toLowerCase().includes(query);
+          result.field.toLowerCase().includes(query) ||
+          result.cycleYear.toLowerCase().includes(query) ||
+          result.university.toLowerCase().includes(query) ||
+          result.program.toLowerCase().includes(query) ||
+          result.applicationRound.toLowerCase().includes(query);
         const matchStatus = filterStatus === "All" || result.status === filterStatus;
         const matchLevel = filterLevel === "All" || result.level === filterLevel;
         const matchCountry = filterCountry === "All" || result.country === filterCountry;
@@ -1010,39 +1014,16 @@ export default function AwaitedApp() {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {[...results].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map((result) => (
-                      <div
-                        key={result.id}
-                        style={{
-                          background: result.hidden ? "rgba(220,38,38,0.05)" : THEME.panelBackgroundStrong,
-                          border: `1px solid ${result.hidden ? "rgba(220,38,38,0.15)" : THEME.panelBorderSoft}`,
-                          borderRadius: 12,
-                          padding: "14px 18px",
-                          opacity: result.hidden ? 0.65 : 1,
-                        }}
-                      >
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
-                              <span style={{ fontWeight: 600, fontSize: 14, textDecoration: result.hidden ? "line-through" : "none" }}>{result.scholarship}</span>
-                              <StatusBadge status={result.status} />
-                              <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
-                              {!isVerifiedScholarship(result.scholarship) && <span style={{ fontSize: 10, color: "#D97706", fontWeight: 500 }}>⚠ Unverified name</span>}
-                            </div>
-                            <div style={{ fontSize: 12, color: THEME.textMuted }}>{result.country} · {result.level} · {result.field} {result.nationality ? `· ${result.nationality}` : ""} · {result.date}</div>
-                            {result.note && <div style={{ fontSize: 12, color: THEME.textSecondary, marginTop: 6, lineHeight: 1.5 }}>{result.note}</div>}
-                          </div>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            {result.reviewState !== "approved" && (
-                              <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setResultReviewState(result.id, "approved"))} color="#059669">Approve</AdminBtn>
-                            )}
-                            {result.reviewState !== "rejected" && (
-                              <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setResultReviewState(result.id, "rejected", "Rejected during moderation"))} color="#D97706">Reject</AdminBtn>
-                            )}
-                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setResultHidden(result.id, !result.hidden))} color={result.hidden ? "#059669" : "#EF4444"}>{result.hidden ? "Unhide" : "Hide"}</AdminBtn>
-                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.deleteResult(result.id))} color="#DC2626">Delete</AdminBtn>
-                          </div>
-                        </div>
-                      </div>
+                      <ModerationResultRow
+                        key={`all-result-${result.id}`}
+                        result={result}
+                        verified={isVerifiedScholarship(result.scholarship)}
+                        onApprove={() => applyStoreMutation(() => appDataStore.setResultReviewState(result.id, "approved"))}
+                        onReject={() => applyStoreMutation(() => appDataStore.setResultReviewState(result.id, "rejected", "Rejected during moderation"))}
+                        onToggleHide={() => applyStoreMutation(() => appDataStore.setResultHidden(result.id, !result.hidden))}
+                        onDelete={() => applyStoreMutation(() => appDataStore.deleteResult(result.id))}
+                        onVerifyName={() => addManualVerifiedScholarship(result.scholarship)}
+                      />
                     ))}
                   </div>
                 </div>
@@ -1440,6 +1421,36 @@ function StatusBadge({ status }) {
   );
 }
 
+function formatResultDate(value) {
+  if (!value) {
+    return "";
+  }
+
+  const [year, month, day] = String(value).split("-");
+  if (!year || !month || !day) {
+    return String(value);
+  }
+
+  const parsed = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  if (Number.isNaN(parsed.getTime())) {
+    return String(value);
+  }
+
+  return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+function getResultSummaryTokens(result) {
+  return [
+    result.country ? `📍 ${result.country}` : "",
+    result.level ? `🎓 ${result.level}` : "",
+    result.field ? `📚 ${result.field}` : "",
+    result.cycleYear ? `🗓 ${result.cycleYear}` : "",
+    result.applicationRound ? `🧭 ${result.applicationRound}` : "",
+    result.nationality ? `🌍 ${result.nationality}` : "",
+    result.gpa ? `📊 GPA: ${result.gpa}` : "",
+  ].filter(Boolean);
+}
+
 function ModerationChip({ reviewState, reason }) {
   if (!reviewState || reviewState === "approved") {
     return null;
@@ -1495,7 +1506,9 @@ function AnalyticsCard({ label, value, color }) {
   );
 }
 
-function ModerationResultRow({ result, verified, onApprove, onReject, onDelete, onVerifyName }) {
+function ModerationResultRow({ result, verified, onApprove, onReject, onDelete, onVerifyName, onToggleHide }) {
+  const summaryTokens = getResultSummaryTokens(result);
+
   return (
     <div style={{ padding: "14px 16px", borderRadius: 12, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)", marginBottom: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
@@ -1506,13 +1519,22 @@ function ModerationResultRow({ result, verified, onApprove, onReject, onDelete, 
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {!verified && <span style={{ fontSize: 10, color: "#D97706" }}>Unknown scholarship</span>}
           </div>
-          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>{result.country} · {result.level} · {result.field} · {result.date}</div>
+          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>
+            {summaryTokens.join(" · ")}
+            {result.date ? ` · ${formatResultDate(result.date)}` : ""}
+          </div>
+          {(result.university || result.program) && (
+            <div style={{ fontSize: 12, color: THEME.textSoft, marginBottom: 6 }}>
+              {[result.university, result.program].filter(Boolean).join(" · ")}
+            </div>
+          )}
           {result.note && <div style={{ fontSize: 13, color: THEME.textSecondary, marginBottom: 6 }}>{result.note}</div>}
           {result.moderationReason && <div style={{ fontSize: 12, color: "#FBBF24" }}>Reason: {result.moderationReason}</div>}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
           <AdminBtn onClick={onApprove} color="#059669">Approve</AdminBtn>
           <AdminBtn onClick={onReject} color="#D97706">Reject</AdminBtn>
+          {onToggleHide && <AdminBtn onClick={onToggleHide} color={result.hidden ? "#059669" : "#EF4444"}>{result.hidden ? "Unhide" : "Hide"}</AdminBtn>}
           {!verified && <AdminBtn onClick={onVerifyName} color="#6366F1">Verify Name</AdminBtn>}
           <AdminBtn onClick={onDelete} color="#DC2626">Delete</AdminBtn>
         </div>
@@ -1540,6 +1562,19 @@ function ResultCard({
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
+  const summaryTokens = getResultSummaryTokens(result);
+  const timelineMetadata = [
+    { label: "Cycle Year", value: result.cycleYear },
+    { label: "Application Round", value: result.applicationRound },
+    { label: "University", value: result.university },
+    { label: "Program", value: result.program },
+    { label: "Applied Date", value: formatResultDate(result.appliedDate) },
+    { label: "Interview Date", value: formatResultDate(result.interviewDate) },
+    { label: "Latest Update", value: formatResultDate(result.date) },
+    { label: "Final Decision", value: formatResultDate(result.finalDecisionDate) },
+    { label: "Nationality", value: result.nationality },
+    { label: "GPA", value: result.gpa },
+  ].filter((item) => item.value);
 
   const handleSendComment = async () => {
     const resultMeta = await onCommentSubmit(commentText, {
@@ -1568,21 +1603,33 @@ function ResultCard({
             {result.hidden && <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>HIDDEN</span>}
           </div>
           <div style={{ display: "flex", gap: 16, fontSize: 12, color: THEME.textMuted, flexWrap: "wrap" }}>
-            <span>📍 {result.country}</span>
-            <span>🎓 {result.level}</span>
-            <span>📚 {result.field}</span>
-            {result.nationality && <span>🌍 {result.nationality}</span>}
-            {result.gpa && <span>📊 GPA: {result.gpa}</span>}
+            {summaryTokens.map((token) => (
+              <span key={token}>{token}</span>
+            ))}
           </div>
+          {(result.university || result.program) && (
+            <div style={{ display: "flex", gap: 14, fontSize: 12, color: THEME.textSoft, flexWrap: "wrap", marginTop: 6 }}>
+              {result.university && <span>🏫 {result.university}</span>}
+              {result.program && <span>🧪 {result.program}</span>}
+            </div>
+          )}
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 12, color: THEME.textSoft }}>{result.date}</div>
+          <div style={{ fontSize: 12, color: THEME.textSoft }}>{formatResultDate(result.date)}</div>
           {visibleComments.length > 0 && <div style={{ fontSize: 11, color: THEME.textSoft, marginTop: 4 }}>💬 {visibleComments.length}</div>}
         </div>
       </div>
 
       {expanded && (
         <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, padding: "16px 20px" }}>
+          {timelineMetadata.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 16 }}>
+              {timelineMetadata.map((item) => (
+                <MetadataItem key={`${result.id}-${item.label}`} label={item.label} value={item.value} />
+              ))}
+            </div>
+          )}
+
           {result.note && (
             <div style={{ fontSize: 13, color: THEME.textSecondary, lineHeight: 1.6, marginBottom: 16, padding: "12px 16px", background: THEME.panelBackgroundSubtle, borderRadius: 10, borderLeft: `3px solid ${STATUS_CONFIG[result.status].color}44` }}>
               {result.note}
@@ -1628,11 +1675,18 @@ function ResultCard({
 function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, customScholarships }) {
   const [form, setForm] = useState({
     scholarship: "",
+    cycleYear: String(new Date().getFullYear()),
     country: "",
     level: "Masters",
     field: "",
+    university: "",
+    program: "",
+    applicationRound: "",
     status: "Applied",
     date: new Date().toISOString().split("T")[0],
+    appliedDate: "",
+    interviewDate: "",
+    finalDecisionDate: "",
     nationality: "",
     gpa: "",
     note: "",
@@ -1656,7 +1710,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
     }
   };
 
-  const valid = form.scholarship.trim() && form.country.trim() && form.field.trim() && (!requiresCaptcha || captchaToken);
+  const valid = form.scholarship.trim() && form.cycleYear.trim() && form.country.trim() && form.field.trim() && (!requiresCaptcha || captchaToken);
 
   const handleSubmit = async () => {
     if (!valid) {
@@ -1710,13 +1764,22 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
           </FormField>
 
           <div style={{ display: "flex", gap: 12 }}>
+            <FormField label="Cycle Year *" style={{ flex: 1 }}>
+              <input value={form.cycleYear} onChange={set("cycleYear")} placeholder="e.g. 2026 or 2026/27" style={inputStyle} />
+            </FormField>
             <FormField label="Country *" style={{ flex: 1 }}>
               <input value={form.country} onChange={set("country")} placeholder="e.g. United Kingdom" style={inputStyle} />
             </FormField>
+          </div>
+
+          <div style={{ display: "flex", gap: 12 }}>
             <FormField label="Study Level *" style={{ flex: 1 }}>
               <select value={form.level} onChange={set("level")} style={inputStyle}>
                 {LEVELS.map((level) => <option key={level} value={level} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{level}</option>)}
               </select>
+            </FormField>
+            <FormField label="Application Round" style={{ flex: 1 }}>
+              <input value={form.applicationRound} onChange={set("applicationRound")} placeholder="e.g. Round 1, Embassy track" style={inputStyle} />
             </FormField>
           </div>
 
@@ -1731,9 +1794,32 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
             </FormField>
           </div>
 
-          <FormField label="Date Notified">
-            <input type="date" value={form.date} onChange={set("date")} style={inputStyle} />
-          </FormField>
+          <div style={{ display: "flex", gap: 12 }}>
+            <FormField label="University / Host Institution" style={{ flex: 1 }}>
+              <input value={form.university} onChange={set("university")} placeholder="e.g. University of Oxford" style={inputStyle} />
+            </FormField>
+            <FormField label="Program / Degree" style={{ flex: 1 }}>
+              <input value={form.program} onChange={set("program")} placeholder="e.g. MSc Economics for Development" style={inputStyle} />
+            </FormField>
+          </div>
+
+          <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, paddingTop: 16, marginTop: 4 }}>
+            <p style={{ color: THEME.textSoft, fontSize: 12, marginBottom: 12 }}>Timeline details make the feed much more useful for other applicants.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+              <FormField label="Applied Date">
+                <input type="date" value={form.appliedDate} onChange={set("appliedDate")} style={inputStyle} />
+              </FormField>
+              <FormField label="Interview Date">
+                <input type="date" value={form.interviewDate} onChange={set("interviewDate")} style={inputStyle} />
+              </FormField>
+              <FormField label="Latest Update Date *">
+                <input type="date" value={form.date} onChange={set("date")} style={inputStyle} />
+              </FormField>
+              <FormField label="Final Decision Date">
+                <input type="date" value={form.finalDecisionDate} onChange={set("finalDecisionDate")} style={inputStyle} />
+              </FormField>
+            </div>
+          </div>
 
           <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, paddingTop: 16, marginTop: 4 }}>
             <p style={{ color: THEME.textSoft, fontSize: 12, marginBottom: 12 }}>Optional — share only what you want</p>

@@ -39,6 +39,33 @@ function ensure(value: string, label: string, maxLength: number) {
   }
 }
 
+function ensureOptional(value: string, label: string, maxLength: number) {
+  if (!value) {
+    return;
+  }
+
+  if (value.length > maxLength) {
+    throw new Error(`${label} must be ${maxLength} characters or fewer.`);
+  }
+}
+
+function ensureDateValue(value: string, label: string, { required = false }: { required?: boolean } = {}) {
+  if (!value) {
+    if (required) {
+      throw new Error(`${label} is required.`);
+    }
+    return;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(`${value}T00:00:00Z`).getTime())) {
+    throw new Error(`${label} must be a valid date.`);
+  }
+}
+
+function compareDates(left: string, right: string) {
+  return new Date(`${left}T00:00:00Z`).getTime() - new Date(`${right}T00:00:00Z`).getTime();
+}
+
 function containsContactDetails(value: string) {
   return /(@|telegram|whatsapp|discord|signal|\+?\d[\d\s\-()]{7,})/i.test(value);
 }
@@ -285,21 +312,52 @@ function inferForumModeration(text: string, recentCount: number) {
 
 async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<string, unknown>, request: Request) {
   const scholarshipName = cleanText(entry.scholarship_name);
+  const cycleYear = cleanText(entry.cycle_year);
   const country = cleanText(entry.country);
   const studyLevel = cleanText(entry.study_level);
   const fieldOfStudy = cleanText(entry.field_of_study);
+  const hostUniversity = cleanText(entry.host_university);
+  const programName = cleanText(entry.program_name);
+  const applicationRound = cleanText(entry.application_round);
   const status = cleanText(entry.status);
   const decisionDate = cleanText(entry.decision_date);
+  const appliedDate = cleanText(entry.applied_date);
+  const interviewDate = cleanText(entry.interview_date);
+  const finalDecisionDate = cleanText(entry.final_decision_date);
   const nationality = cleanText(entry.nationality);
   const gpa = cleanText(entry.gpa);
   const note = cleanText(entry.note);
 
   ensure(scholarshipName, "Scholarship name", 160);
+  ensure(cycleYear, "Cycle year", 32);
   ensure(country, "Country", 120);
   ensure(studyLevel, "Study level", 40);
   ensure(fieldOfStudy, "Field of study", 160);
   ensure(status, "Status", 40);
-  ensure(decisionDate, "Decision date", 32);
+  ensureDateValue(decisionDate, "Latest update date", { required: true });
+  ensureOptional(hostUniversity, "University", 160);
+  ensureOptional(programName, "Program", 160);
+  ensureOptional(applicationRound, "Application round", 80);
+  ensureDateValue(appliedDate, "Applied date");
+  ensureDateValue(interviewDate, "Interview date");
+  ensureDateValue(finalDecisionDate, "Final decision date");
+
+  const normalizedAppliedDate = appliedDate || (status === "Applied" ? decisionDate : "");
+  const normalizedInterviewDate = interviewDate || (status === "Interview" ? decisionDate : "");
+  const normalizedFinalDecisionDate =
+    finalDecisionDate || (["Accepted", "Rejected", "Waitlisted"].includes(status) ? decisionDate : "");
+
+  if (normalizedAppliedDate && normalizedInterviewDate && compareDates(normalizedInterviewDate, normalizedAppliedDate) < 0) {
+    throw new Error("Interview date cannot be earlier than applied date.");
+  }
+
+  if (normalizedAppliedDate && normalizedFinalDecisionDate && compareDates(normalizedFinalDecisionDate, normalizedAppliedDate) < 0) {
+    throw new Error("Final decision date cannot be earlier than applied date.");
+  }
+
+  if (normalizedInterviewDate && normalizedFinalDecisionDate && compareDates(normalizedFinalDecisionDate, normalizedInterviewDate) < 0) {
+    throw new Error("Final decision date cannot be earlier than interview date.");
+  }
 
   const fingerprintHash = await buildFingerprintHash(meta, request);
   const humanTrust = await ensureHuman(meta, request, fingerprintHash);
@@ -315,11 +373,18 @@ async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<s
 
   const { error } = await adminClient.from("scholarship_results").insert({
     scholarship_name: scholarshipName,
+    cycle_year: cycleYear,
     country,
     study_level: studyLevel,
     field_of_study: fieldOfStudy,
+    host_university: hostUniversity || null,
+    program_name: programName || null,
+    application_round: applicationRound || null,
     status,
     decision_date: decisionDate,
+    applied_date: normalizedAppliedDate || null,
+    interview_date: normalizedInterviewDate || null,
+    final_decision_date: normalizedFinalDecisionDate || null,
     nationality: nationality || null,
     gpa: gpa || null,
     note: note || null,

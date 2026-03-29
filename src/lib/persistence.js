@@ -26,16 +26,30 @@ function normalizeComments(comments = [], resultId = "result") {
 function normalizeResults(results = []) {
   return results
     .filter((result) => result && typeof result.scholarship === "string")
-    .map((result, index) => ({
-      ...result,
-      id: result.id ?? `local-result-${index}`,
-      scholarship: getCanonicalScholarshipName(result.scholarship),
-      comments: normalizeComments(result.comments, result.id ?? `local-result-${index}`),
-      hidden: Boolean(result.hidden),
-      reviewState: result.reviewState || "approved",
-      moderationReason: result.moderationReason || "",
-      createdAt: result.createdAt || new Date().toISOString(),
-    }));
+    .map((result, index) => {
+      const status = result.status || "Applied";
+      const date = result.date || "";
+
+      return {
+        ...result,
+        id: result.id ?? `local-result-${index}`,
+        scholarship: getCanonicalScholarshipName(result.scholarship),
+        cycleYear: result.cycleYear || "",
+        university: result.university || "",
+        program: result.program || "",
+        applicationRound: result.applicationRound || "",
+        appliedDate: result.appliedDate || (status === "Applied" ? date : ""),
+        interviewDate: result.interviewDate || (status === "Interview" ? date : ""),
+        finalDecisionDate:
+          result.finalDecisionDate ||
+          (["Accepted", "Rejected", "Waitlisted"].includes(status) ? date : ""),
+        comments: normalizeComments(result.comments, result.id ?? `local-result-${index}`),
+        hidden: Boolean(result.hidden),
+        reviewState: result.reviewState || "approved",
+        moderationReason: result.moderationReason || "",
+        createdAt: result.createdAt || new Date().toISOString(),
+      };
+    });
 }
 
 function normalizeBlogPosts(posts = []) {

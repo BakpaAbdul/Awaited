@@ -11,7 +11,7 @@ Users anonymously report their scholarship application outcomes (Applied → Int
 ## Features
 
 ### For applicants
-- **Anonymous result submission** — report scholarship name, status, date, study level, country. Optionally share GPA, nationality, field of study.
+- **Anonymous result submission** — report scholarship name, cycle year, status timeline, study level, country, university/program, and key dates. Optionally share GPA, nationality, and notes.
 - **Search & filter** — find results by scholarship name, country, study level, or status.
 - **Scholarship pages** — click any scholarship to see its dedicated page with a visual status breakdown.
 - **Discussion threads** — comment anonymously on any result to ask questions or share tips.

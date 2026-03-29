@@ -1,4 +1,5 @@
 import { LEVELS } from "./constants";
+import { inferMissingTimelineDates } from "./statusSemantics";
 
 const URL_PATTERN = /\b(?:https?:\/\/|www\.)\S+/i;
 
@@ -137,17 +138,15 @@ export function sanitizeSubmission(entry = {}) {
   ensureDateValue(sanitized.interviewDate, "Interview date");
   ensureDateValue(sanitized.finalDecisionDate, "Final decision date");
 
-  if (sanitized.status === "Applied" && !sanitized.appliedDate) {
-    sanitized.appliedDate = sanitized.date;
-  }
+  const inferredTimeline = inferMissingTimelineDates(sanitized.status, sanitized.date, {
+    appliedDate: sanitized.appliedDate,
+    interviewDate: sanitized.interviewDate,
+    finalDecisionDate: sanitized.finalDecisionDate,
+  });
 
-  if (sanitized.status === "Interview" && !sanitized.interviewDate) {
-    sanitized.interviewDate = sanitized.date;
-  }
-
-  if (["Accepted", "Rejected", "Waitlisted"].includes(sanitized.status) && !sanitized.finalDecisionDate) {
-    sanitized.finalDecisionDate = sanitized.date;
-  }
+  sanitized.appliedDate = inferredTimeline.appliedDate;
+  sanitized.interviewDate = inferredTimeline.interviewDate;
+  sanitized.finalDecisionDate = inferredTimeline.finalDecisionDate;
 
   if (sanitized.appliedDate && sanitized.interviewDate && compareDates(sanitized.interviewDate, sanitized.appliedDate) < 0) {
     throw new Error("Interview date cannot be earlier than applied date.");
@@ -216,26 +215,32 @@ export function validateSubmissionDraft(entry = {}, { requiresCaptcha = false, c
   validateDate(errors, "interviewDate", normalized.interviewDate, "Interview date");
   validateDate(errors, "finalDecisionDate", normalized.finalDecisionDate, "Final decision date");
 
+  const inferredTimeline = inferMissingTimelineDates(normalized.status, normalized.date, {
+    appliedDate: normalized.appliedDate,
+    interviewDate: normalized.interviewDate,
+    finalDecisionDate: normalized.finalDecisionDate,
+  });
+
   if (
-    normalized.appliedDate &&
-    normalized.interviewDate &&
-    compareDates(normalized.interviewDate, normalized.appliedDate) < 0
+    inferredTimeline.appliedDate &&
+    inferredTimeline.interviewDate &&
+    compareDates(inferredTimeline.interviewDate, inferredTimeline.appliedDate) < 0
   ) {
     addError(errors, "interviewDate", "Interview date cannot be earlier than applied date.");
   }
 
   if (
-    normalized.appliedDate &&
-    normalized.finalDecisionDate &&
-    compareDates(normalized.finalDecisionDate, normalized.appliedDate) < 0
+    inferredTimeline.appliedDate &&
+    inferredTimeline.finalDecisionDate &&
+    compareDates(inferredTimeline.finalDecisionDate, inferredTimeline.appliedDate) < 0
   ) {
     addError(errors, "finalDecisionDate", "Final decision date cannot be earlier than applied date.");
   }
 
   if (
-    normalized.interviewDate &&
-    normalized.finalDecisionDate &&
-    compareDates(normalized.finalDecisionDate, normalized.interviewDate) < 0
+    inferredTimeline.interviewDate &&
+    inferredTimeline.finalDecisionDate &&
+    compareDates(inferredTimeline.finalDecisionDate, inferredTimeline.interviewDate) < 0
   ) {
     addError(errors, "finalDecisionDate", "Final decision date cannot be earlier than interview date.");
   }

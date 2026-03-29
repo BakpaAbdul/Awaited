@@ -7,6 +7,7 @@ import {
   isDatabaseScholarship,
   sortScholarshipNames,
 } from "./scholarships";
+import { inferMissingTimelineDates } from "./statusSemantics";
 
 const STORAGE_KEY = "awaited:app-data:v2";
 
@@ -29,6 +30,11 @@ function normalizeResults(results = []) {
     .map((result, index) => {
       const status = result.status || "Applied";
       const date = result.date || "";
+      const inferredTimeline = inferMissingTimelineDates(status, date, {
+        appliedDate: result.appliedDate || "",
+        interviewDate: result.interviewDate || "",
+        finalDecisionDate: result.finalDecisionDate || "",
+      });
 
       return {
         ...result,
@@ -38,11 +44,9 @@ function normalizeResults(results = []) {
         university: result.university || "",
         program: result.program || "",
         applicationRound: result.applicationRound || "",
-        appliedDate: result.appliedDate || (status === "Applied" ? date : ""),
-        interviewDate: result.interviewDate || (status === "Interview" ? date : ""),
-        finalDecisionDate:
-          result.finalDecisionDate ||
-          (["Accepted", "Rejected", "Waitlisted"].includes(status) ? date : ""),
+        appliedDate: inferredTimeline.appliedDate,
+        interviewDate: inferredTimeline.interviewDate,
+        finalDecisionDate: inferredTimeline.finalDecisionDate,
         comments: normalizeComments(result.comments, result.id ?? `local-result-${index}`),
         hidden: Boolean(result.hidden),
         reviewState: result.reviewState || "approved",

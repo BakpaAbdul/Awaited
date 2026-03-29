@@ -1,5 +1,5 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { LEVELS } from "../lib/constants";
+import { getDisplayStatuses, LEVELS } from "../lib/constants";
 import { inputStyle, THEME } from "../lib/theme";
 import { ResultCard } from "../components/results";
 import { EmptyFeedState, FilterSelect, TrustNotice } from "../components/siteChrome";
@@ -21,6 +21,8 @@ export default function FeedPage({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterLevel, setFilterLevel] = useState("All");
   const [filterCountry, setFilterCountry] = useState("All");
+  const [filterStatus, setFilterStatus] = useState("All");
+  const [showAllScholarships, setShowAllScholarships] = useState(false);
   const [expandedCard, setExpandedCard] = useState(null);
   const [newComments, setNewComments] = useState({});
   const [visibleCount, setVisibleCount] = useState(RESULTS_PAGE_SIZE);
@@ -31,7 +33,12 @@ export default function FeedPage({
     [visibleResults],
   );
 
-  const popularScholarships = useMemo(
+  const availableStatuses = useMemo(
+    () => getDisplayStatuses(visibleResults.map((result) => result.status)),
+    [visibleResults],
+  );
+
+  const rankedScholarships = useMemo(
     () =>
       Object.entries(
         visibleResults.reduce((accumulator, result) => {
@@ -39,8 +46,7 @@ export default function FeedPage({
           return accumulator;
         }, {}),
       )
-        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))
-        .slice(0, POPULAR_SCHOLARSHIP_LIMIT),
+        .sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0])),
     [visibleResults],
   );
 
@@ -48,27 +54,36 @@ export default function FeedPage({
     return visibleResults
       .filter((result) => {
         const query = deferredQuery.toLowerCase();
-        const matchSearch =
-          !query ||
-          result.scholarship.toLowerCase().includes(query) ||
-          result.country.toLowerCase().includes(query) ||
-          result.field.toLowerCase().includes(query) ||
-          result.cycleYear.toLowerCase().includes(query) ||
-          result.university.toLowerCase().includes(query) ||
-          result.program.toLowerCase().includes(query) ||
-          result.applicationRound.toLowerCase().includes(query);
+        const searchableText = [
+          result.scholarship,
+          result.country,
+          result.field,
+          result.cycleYear,
+          result.university,
+          result.program,
+          result.applicationRound,
+          result.status,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        const matchSearch = !query || searchableText.includes(query);
         const matchLevel = filterLevel === "All" || result.level === filterLevel;
         const matchCountry = filterCountry === "All" || result.country === filterCountry;
-        return matchSearch && matchLevel && matchCountry;
+        const matchStatus = filterStatus === "All" || result.status === filterStatus;
+        return matchSearch && matchLevel && matchCountry && matchStatus;
       })
       .sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [visibleResults, deferredQuery, filterLevel, filterCountry]);
+  }, [visibleResults, deferredQuery, filterLevel, filterCountry, filterStatus]);
 
   useEffect(() => {
     setVisibleCount(RESULTS_PAGE_SIZE);
-  }, [deferredQuery, filterLevel, filterCountry]);
+  }, [deferredQuery, filterLevel, filterCountry, filterStatus]);
 
   const visibleSlice = filtered.slice(0, visibleCount);
+  const scholarshipShortcuts = showAllScholarships
+    ? rankedScholarships
+    : rankedScholarships.slice(0, POPULAR_SCHOLARSHIP_LIMIT);
 
   return (
     <>
@@ -95,34 +110,77 @@ export default function FeedPage({
           options={["All", ...countries]}
           label="Filter by country"
         />
+        <FilterSelect
+          value={filterStatus}
+          onChange={(event) => setFilterStatus(event.target.value)}
+          options={["All", ...availableStatuses]}
+          label="Filter by status"
+        />
       </div>
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
-        {popularScholarships.map(([name, count]) => {
-          return (
-            <button
-              key={name}
-              onClick={() => onNavigate("scholarship", { scholarshipName: name })}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 20,
-                border: `1px solid ${THEME.panelBorder}`,
-                background: THEME.panelBackgroundStrong,
-                color: THEME.textSecondary,
-                fontSize: 12,
-                fontWeight: 500,
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              {isVerifiedScholarship(name) ? <span style={{ color: "#059669", fontSize: 10 }}>✓</span> : null}
-              {name} ({count})
-            </button>
-          );
-        })}
-      </div>
+      {rankedScholarships.length > 0 ? (
+        <div style={{ marginBottom: 20 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              gap: 12,
+              flexWrap: "wrap",
+              marginBottom: 10,
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, color: THEME.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>
+              Most active scholarships
+            </div>
+            {rankedScholarships.length > POPULAR_SCHOLARSHIP_LIMIT ? (
+              <button
+                type="button"
+                onClick={() => setShowAllScholarships((current) => !current)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 999,
+                  border: `1px solid ${THEME.panelBorder}`,
+                  background: THEME.panelBackgroundStrong,
+                  color: THEME.textPrimary,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {showAllScholarships ? "Show fewer" : `Show all ${rankedScholarships.length}`}
+              </button>
+            ) : null}
+          </div>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {scholarshipShortcuts.map(([name, count]) => {
+              return (
+                <button
+                  key={name}
+                  onClick={() => onNavigate("scholarship", { scholarshipName: name })}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: 20,
+                    border: `1px solid ${THEME.panelBorder}`,
+                    background: THEME.panelBackgroundStrong,
+                    color: THEME.textSecondary,
+                    fontSize: 12,
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}
+                >
+                  {isVerifiedScholarship(name) ? <span style={{ color: "#059669", fontSize: 10 }}>✓</span> : null}
+                  {name} ({count})
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {filtered.length === 0 ? (
         visibleResults.length === 0 ? (

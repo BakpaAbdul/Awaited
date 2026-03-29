@@ -1,12 +1,13 @@
 import scholarshipsDB from './scholarships-db.json';
+import { getStatusConfig as deriveStatusConfig } from "./statusSemantics";
 
 // ─── Status visual config ────────────────────────────────────────
 export const STATUS_CONFIG = {
-  Applied:    { color: "#6B7280", bg: "#F3F4F6", icon: "○" },
-  Interview:  { color: "#D97706", bg: "#FEF3C7", icon: "◎" },
-  Waitlisted: { color: "#7C3AED", bg: "#EDE9FE", icon: "◑" },
-  Accepted:   { color: "#059669", bg: "#D1FAE5", icon: "●" },
-  Rejected:   { color: "#DC2626", bg: "#FEE2E2", icon: "✕" },
+  Applied: deriveStatusConfig("Applied"),
+  Interview: deriveStatusConfig("Interview"),
+  Waitlisted: deriveStatusConfig("Waitlisted"),
+  Accepted: deriveStatusConfig("Accepted"),
+  Rejected: deriveStatusConfig("Rejected"),
 };
 
 export const STATUSES = ["Applied", "Interview", "Waitlisted", "Accepted", "Rejected"];
@@ -14,37 +15,7 @@ export const CUSTOM_STATUS_OPTION = "__custom_status__";
 export const LEVELS = ["Undergrad", "Masters", "PhD", "Postdoc"];
 
 export function getStatusConfig(status = "") {
-  if (STATUS_CONFIG[status]) {
-    return STATUS_CONFIG[status];
-  }
-
-  const normalizedStatus = status.trim().toLowerCase();
-
-  if (/(accepted|approved|awarded|selected|winner|granted|admitted|offer)/i.test(normalizedStatus)) {
-    return { color: "#059669", bg: "#D1FAE5", icon: "●" };
-  }
-
-  if (/(rejected|denied|unsuccessful|declined|not selected|failed)/i.test(normalizedStatus)) {
-    return { color: "#DC2626", bg: "#FEE2E2", icon: "✕" };
-  }
-
-  if (/(interview|shortlist|shortlisted|nominated|nomination|finalist)/i.test(normalizedStatus)) {
-    return { color: "#D97706", bg: "#FEF3C7", icon: "◎" };
-  }
-
-  if (/(wait|reserve|alternate|holding)/i.test(normalizedStatus)) {
-    return { color: "#7C3AED", bg: "#EDE9FE", icon: "◑" };
-  }
-
-  if (/(review|screening|processing|assessment|evaluation|checking)/i.test(normalizedStatus)) {
-    return { color: "#2563EB", bg: "#DBEAFE", icon: "◌" };
-  }
-
-  return {
-    color: "#0f766e",
-    bg: "#ccfbf1",
-    icon: "◌",
-  };
+  return deriveStatusConfig(status);
 }
 
 export function getDisplayStatuses(statuses = []) {

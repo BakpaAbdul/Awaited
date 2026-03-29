@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inferMissingTimelineDates } from "../../../src/lib/statusSemantics.js";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -342,10 +343,14 @@ async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<s
   ensureDateValue(interviewDate, "Interview date");
   ensureDateValue(finalDecisionDate, "Final decision date");
 
-  const normalizedAppliedDate = appliedDate || (status === "Applied" ? decisionDate : "");
-  const normalizedInterviewDate = interviewDate || (status === "Interview" ? decisionDate : "");
-  const normalizedFinalDecisionDate =
-    finalDecisionDate || (["Accepted", "Rejected", "Waitlisted"].includes(status) ? decisionDate : "");
+  const inferredTimeline = inferMissingTimelineDates(status, decisionDate, {
+    appliedDate,
+    interviewDate,
+    finalDecisionDate,
+  });
+  const normalizedAppliedDate = inferredTimeline.appliedDate;
+  const normalizedInterviewDate = inferredTimeline.interviewDate;
+  const normalizedFinalDecisionDate = inferredTimeline.finalDecisionDate;
 
   if (normalizedAppliedDate && normalizedInterviewDate && compareDates(normalizedInterviewDate, normalizedAppliedDate) < 0) {
     throw new Error("Interview date cannot be earlier than applied date.");

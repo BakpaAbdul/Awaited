@@ -34,4 +34,15 @@ describe("validateSubmissionDraft", () => {
 
     expect(errors.status).toBeUndefined();
   });
+
+  it("rejects custom statuses that include links", () => {
+    const errors = validateSubmissionDraft({
+      scholarship: "Chevening Scholarship",
+      country: "United Kingdom",
+      status: "Shortlisted https://spam.example",
+      date: "2026-03-10",
+    });
+
+    expect(errors.status).toContain("cannot include links");
+  });
 });

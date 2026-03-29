@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getStatusConfig, STATUS_CONFIG } from "../lib/constants";
+import { getStatusConfig } from "../lib/constants";
 import { inputStyle, panelStyle, panelTitle, primaryButtonStyle, THEME } from "../lib/theme";
 import { hasStoredHumanTrust } from "../lib/humanVerification";
 import { turnstileSiteKey } from "../lib/supabaseClient";
@@ -290,6 +290,7 @@ export function ResultCard({
   const commentInputRef = useRef(null);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
   const summaryItems = getResultSummaryItems(result);
+  const statusConfig = getStatusConfig(result.status);
   const detailsId = `result-details-${result.id}`;
   const timelineMetadata = [
     { label: "Cycle Year", value: result.cycleYear },
@@ -328,9 +329,7 @@ export function ResultCard({
     }
   }, [expanded, focusComposerOnExpand]);
 
-  const handleReplyClick = (event) => {
-    event.stopPropagation();
-
+  const handleReplyClick = () => {
     if (!expanded) {
       setFocusComposerOnExpand(true);
       onToggle();
@@ -352,24 +351,12 @@ export function ResultCard({
       }}
     >
       <div
-        role="button"
-        tabIndex={0}
-        onClick={onToggle}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            onToggle();
-          }
-        }}
-        aria-expanded={expanded}
-        aria-controls={detailsId}
         style={{
           width: "100%",
           padding: "16px 20px",
           display: "flex",
           alignItems: "flex-start",
           gap: 16,
-          cursor: "pointer",
           background: "transparent",
           textAlign: "left",
         }}
@@ -377,22 +364,24 @@ export function ResultCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             {verified ? <span style={{ color: "#059669", fontSize: 11 }} title="Verified scholarship">✓</span> : null}
-            <span
-              onClick={(event) => {
-                event.stopPropagation();
-                onScholarshipClick(result.scholarship);
-              }}
+            <button
+              type="button"
+              onClick={() => onScholarshipClick(result.scholarship)}
               style={{
                 fontSize: 15,
                 fontWeight: 600,
                 color: THEME.textPrimary,
                 cursor: "pointer",
+                border: "none",
                 borderBottom: `1px dashed ${THEME.dashedBorder}`,
                 textDecoration: result.hidden ? "line-through" : "none",
+                background: "none",
+                padding: 0,
+                textAlign: "left",
               }}
             >
               {result.scholarship}
-            </span>
+            </button>
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {result.hidden ? <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>HIDDEN</span> : null}
           </div>
@@ -426,6 +415,24 @@ export function ResultCard({
               }}
             >
               Reply
+            </button>
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              aria-controls={detailsId}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: `1px solid ${THEME.panelBorder}`,
+                background: THEME.panelBackgroundStrong,
+                color: THEME.textPrimary,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {expanded ? "Hide" : "Details"}
             </button>
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, color: THEME.textSoft, fontSize: 12 }}>
@@ -462,7 +469,7 @@ export function ResultCard({
                 padding: "12px 16px",
                 background: THEME.panelBackgroundSubtle,
                 borderRadius: 10,
-                borderLeft: `3px solid ${STATUS_CONFIG[result.status].color}44`,
+                borderLeft: `3px solid ${statusConfig.color}44`,
               }}
             >
               {result.note}

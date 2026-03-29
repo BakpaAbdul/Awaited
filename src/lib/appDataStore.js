@@ -10,6 +10,7 @@ import {
   isDatabaseScholarship,
   sortScholarshipNames,
 } from "./scholarships";
+import { inferMissingTimelineDates } from "./statusSemantics";
 
 const RESULTS_TABLE = "scholarship_results";
 const COMMENTS_TABLE = "scholarship_comments";
@@ -58,6 +59,12 @@ function mapCommentRow(row) {
 }
 
 function mapResultRow(row, comments = []) {
+  const inferredTimeline = inferMissingTimelineDates(row.status, row.decision_date || "", {
+    appliedDate: row.applied_date || "",
+    interviewDate: row.interview_date || "",
+    finalDecisionDate: row.final_decision_date || "",
+  });
+
   return {
     id: row.id,
     scholarship: row.scholarship_name,
@@ -70,11 +77,9 @@ function mapResultRow(row, comments = []) {
     applicationRound: row.application_round || "",
     status: row.status,
     date: row.decision_date,
-    appliedDate: row.applied_date || (row.status === "Applied" ? row.decision_date || "" : ""),
-    interviewDate: row.interview_date || (row.status === "Interview" ? row.decision_date || "" : ""),
-    finalDecisionDate:
-      row.final_decision_date ||
-      (["Accepted", "Rejected", "Waitlisted"].includes(row.status) ? row.decision_date || "" : ""),
+    appliedDate: inferredTimeline.appliedDate,
+    interviewDate: inferredTimeline.interviewDate,
+    finalDecisionDate: inferredTimeline.finalDecisionDate,
     nationality: row.nationality || "",
     gpa: row.gpa || "",
     note: row.note || "",

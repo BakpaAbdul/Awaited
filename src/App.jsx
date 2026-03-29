@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { LEVELS, STATUSES, STATUS_CONFIG } from "./lib/constants";
-import { loadPersistedAppData, persistAppData, PERSISTENCE_MODE } from "./lib/persistence";
+import { appDataStore, DATA_BACKEND_MODE } from "./lib/appDataStore";
 import {
   buildScholarshipSuggestions,
   DATABASE_SCHOLARSHIP_NAMES,
@@ -8,16 +8,15 @@ import {
   getCanonicalScholarshipName,
   getScholarshipRecord,
   isDatabaseScholarship,
-  removeScholarshipName,
   sortScholarshipNames,
 } from "./lib/scholarships";
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "scholar2026";
-
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function AwaitedApp() {
-  const [appData, setAppData] = useState(() => loadPersistedAppData());
+  const [appData, setAppData] = useState(() => appDataStore.getInitialAppData());
+  const [activeDataMode, setActiveDataMode] = useState(DATA_BACKEND_MODE);
+  const [isHydrating, setIsHydrating] = useState(DATA_BACKEND_MODE === "supabase");
+  const [syncError, setSyncError] = useState("");
   const [view, setView] = useState("feed");
   const [selectedScholarship, setSelectedScholarship] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -31,6 +30,7 @@ export default function AwaitedApp() {
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminPw, setAdminPw] = useState("");
+  const [adminSecret, setAdminSecret] = useState("");
   const [adminPwError, setAdminPwError] = useState(false);
   const [adminTab, setAdminTab] = useState("moderation");
   const [newVerified, setNewVerified] = useState("");
@@ -44,51 +44,64 @@ export default function AwaitedApp() {
   );
 
   useEffect(() => {
-    persistAppData(appData);
-  }, [appData]);
+    let cancelled = false;
 
-  const setResults = (updater) => {
-    setAppData(prev => ({
-      ...prev,
-      results: typeof updater === "function" ? updater(prev.results) : updater,
-    }));
-  };
+    async function hydrateAppData() {
+      try {
+        const { appData: nextData, activeMode, syncError: nextSyncError } = await appDataStore.hydrateAppData();
+        if (!cancelled) {
+          setAppData(nextData);
+          setActiveDataMode(activeMode);
+          setSyncError(nextSyncError);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setSyncError(error instanceof Error ? error.message : "Failed to load data.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsHydrating(false);
+        }
+      }
+    }
 
-  const setVerifiedList = (updater) => {
-    setAppData(prev => ({
-      ...prev,
-      verifiedList: typeof updater === "function" ? updater(prev.verifiedList) : updater,
-    }));
-  };
+    hydrateAppData();
 
-  const setCustomScholarships = (updater) => {
-    setAppData(prev => ({
-      ...prev,
-      customScholarships: typeof updater === "function" ? updater(prev.customScholarships || []) : updater,
-    }));
-  };
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (DATA_BACKEND_MODE !== "supabase") {
+      return undefined;
+    }
+
+    return appDataStore.subscribeToAppData(
+      (nextData) => {
+        setAppData(nextData);
+        setActiveDataMode("supabase");
+        setSyncError("");
+      },
+      (error) => {
+        setSyncError(error instanceof Error ? error.message : "Realtime sync failed.");
+      },
+    );
+  }, []);
 
   const isVerifiedScholarship = (name) => isDatabaseScholarship(name) || Boolean(findMatchingScholarshipName(name, manualVerifiedList));
 
-  const addManualVerifiedScholarship = (name) => {
-    const canonicalName = getCanonicalScholarshipName(name);
-    const matchedName =
-      findMatchingScholarshipName(canonicalName, [...manualVerifiedList, ...customScholarships]) ||
-      findMatchingScholarshipName(name, [...manualVerifiedList, ...customScholarships]) ||
-      canonicalName;
-
-    if (!matchedName || isDatabaseScholarship(matchedName)) {
-      setNewVerified("");
-      return;
+  const applyStoreMutation = async (operation, { onSuccess } = {}) => {
+    try {
+      const nextData = await operation();
+      setAppData(nextData);
+      setSyncError("");
+      onSuccess?.(nextData);
+      return nextData;
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : "Failed to save changes.");
+      return null;
     }
-
-    setVerifiedList((prev) =>
-      findMatchingScholarshipName(matchedName, prev) ? prev : sortScholarshipNames([...prev, matchedName]),
-    );
-    setCustomScholarships((prev) =>
-      findMatchingScholarshipName(matchedName, prev) ? prev : sortScholarshipNames([...prev, matchedName]),
-    );
-    setNewVerified("");
   };
 
   const visibleResults = useMemo(() => results.filter(r => !r.hidden || isAdmin), [results, isAdmin]);
@@ -141,44 +154,86 @@ export default function AwaitedApp() {
     return { entries, statusCounts, name: selectedScholarship, record: getScholarshipRecord(selectedScholarship) };
   }, [selectedScholarship, visibleResults]);
 
-  const handleSubmit = (entry) => {
-    const canonicalName = getCanonicalScholarshipName(entry.scholarship);
+  const handleSubmit = async (entry) => {
+    await applyStoreMutation(() => appDataStore.submitResult(entry), {
+      onSuccess: () => {
+        setView("feed");
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+      },
+    });
+  };
+
+  const handleAddComment = async (resultId, text) => {
+    if (!text.trim()) return;
+    await applyStoreMutation(() => appDataStore.addComment(resultId, text.trim()), {
+      onSuccess: () => {
+        setNewComments(prev => ({ ...prev, [resultId]: "" }));
+      },
+    });
+  };
+
+  const handleToggleHide = async (id, hidden) => {
+    await applyStoreMutation(() => appDataStore.setResultHidden(id, hidden, adminSecret));
+  };
+
+  const handleDelete = async (id) => {
+    await applyStoreMutation(() => appDataStore.deleteResult(id, adminSecret));
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    await applyStoreMutation(() => appDataStore.deleteComment(commentId, adminSecret));
+  };
+
+  const handleAdminLogin = async () => {
+    try {
+      const password = adminPw;
+      const isValid = await appDataStore.verifyAdminPassword(password);
+
+      if (isValid) {
+        setIsAdmin(true);
+        setAdminSecret(password);
+        setAdminPwError(false);
+        setAdminPw("");
+        setSyncError("");
+      } else {
+        setAdminPwError(true);
+      }
+    } catch (error) {
+      setAdminPwError(true);
+      setSyncError(error instanceof Error ? error.message : "Admin login failed.");
+    }
+  };
+
+  const addManualVerifiedScholarship = async (name) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+
+    const canonicalName = getCanonicalScholarshipName(trimmedName);
     const matchedName =
       findMatchingScholarshipName(canonicalName, [...manualVerifiedList, ...customScholarships]) ||
-      findMatchingScholarshipName(entry.scholarship, [...manualVerifiedList, ...customScholarships]) ||
+      findMatchingScholarshipName(trimmedName, [...manualVerifiedList, ...customScholarships]) ||
       canonicalName;
-    const newEntry = { ...entry, scholarship: matchedName, id: Date.now(), comments: [], hidden: false, createdAt: new Date().toISOString() };
-    setResults(prev => [newEntry, ...prev]);
-    if (!isDatabaseScholarship(matchedName)) {
-      setCustomScholarships((prev) =>
-        findMatchingScholarshipName(matchedName, prev) ? prev : sortScholarshipNames([...prev, matchedName]),
-      );
+
+    if (!matchedName || isDatabaseScholarship(matchedName)) {
+      setNewVerified("");
+      return;
     }
-    setView("feed");
-    setShowSuccess(true);
-    setTimeout(() => setShowSuccess(false), 3000);
+
+    await applyStoreMutation(() => appDataStore.addVerifiedScholarship(matchedName, adminSecret), {
+      onSuccess: () => {
+        setNewVerified("");
+      },
+    });
   };
 
-  const handleAddComment = (resultId, text) => {
-    if (!text.trim()) return;
-    setResults(prev => prev.map(r => r.id === resultId ? { ...r, comments: [...r.comments, { text, time: new Date().toISOString().split("T")[0] }] } : r));
-    setNewComments(prev => ({ ...prev, [resultId]: "" }));
+  const handleAddVerified = async () => {
+    await addManualVerifiedScholarship(newVerified);
   };
 
-  const handleToggleHide = (id) => setResults(prev => prev.map(r => r.id === id ? { ...r, hidden: !r.hidden } : r));
-  const handleDelete = (id) => setResults(prev => prev.filter(r => r.id !== id));
-  const handleDeleteComment = (resultId, commentIdx) => setResults(prev => prev.map(r => r.id === resultId ? { ...r, comments: r.comments.filter((_, i) => i !== commentIdx) } : r));
-
-  const handleAdminLogin = () => {
-    if (adminPw === ADMIN_PASSWORD) { setIsAdmin(true); setAdminPwError(false); setAdminPw(""); }
-    else { setAdminPwError(true); }
+  const handleRemoveVerified = async (name) => {
+    await applyStoreMutation(() => appDataStore.removeVerifiedScholarship(name, adminSecret));
   };
-
-  const handleAddVerified = () => {
-    addManualVerifiedScholarship(newVerified.trim());
-  };
-
-  const handleRemoveVerified = (name) => setVerifiedList(prev => removeScholarshipName(prev, name));
 
   const openScholarship = (name) => { setSelectedScholarship(name); setView("scholarship"); };
   const goFeed = () => { setView("feed"); setSelectedScholarship(null); };
@@ -205,7 +260,7 @@ export default function AwaitedApp() {
           {isAdmin ? (
             <>
               <NavBtn active={view === "admin"} onClick={() => setView("admin")} admin>⚙ Admin</NavBtn>
-              <button onClick={() => { setIsAdmin(false); if (view === "admin") goFeed(); }} style={{ background: "none", border: "none", color: "#64748B", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Logout</button>
+              <button onClick={() => { setIsAdmin(false); setAdminSecret(""); if (view === "admin") goFeed(); }} style={{ background: "none", border: "none", color: "#64748B", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Logout</button>
             </>
           ) : (
             <button onClick={() => setView("login")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, color: "#475569", fontSize: 11, cursor: "pointer", padding: "6px 12px" }}>Admin</button>
@@ -220,10 +275,36 @@ export default function AwaitedApp() {
         </div>
       )}
 
-      {PERSISTENCE_MODE === "browser-local" && (
+      {activeDataMode === "supabase" && (
+        <div style={{ background: "rgba(5,150,105,0.08)", borderBottom: "1px solid rgba(5,150,105,0.18)", padding: "8px 28px", fontSize: 12, color: "#6EE7B7", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
+          Shared backend active — submissions, moderation, and live updates sync across users through Supabase.
+        </div>
+      )}
+
+      {activeDataMode === "browser-local" && DATA_BACKEND_MODE === "supabase" && (
         <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#FBBF24", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F59E0B" }} />
-          Local beta mode active — submissions now survive refreshes in this browser, but shared cross-device persistence still needs a backend.
+          Supabase is configured, but this session is currently using browser-local fallback because the backend could not be reached.
+        </div>
+      )}
+
+      {activeDataMode === "browser-local" && DATA_BACKEND_MODE === "browser-local" && (
+        <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#FBBF24", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F59E0B" }} />
+          Browser-local fallback active — data survives refreshes on this device, but shared sync will only work after Supabase env vars are configured.
+        </div>
+      )}
+
+      {isHydrating && (
+        <div style={{ background: "rgba(56,189,248,0.08)", borderBottom: "1px solid rgba(56,189,248,0.16)", padding: "8px 28px", fontSize: 12, color: "#7DD3FC" }}>
+          Loading shared scholarship data…
+        </div>
+      )}
+
+      {syncError && (
+        <div style={{ background: "rgba(220,38,38,0.08)", borderBottom: "1px solid rgba(220,38,38,0.16)", padding: "8px 28px", fontSize: 12, color: "#FCA5A5" }}>
+          {syncError}
         </div>
       )}
 
@@ -285,10 +366,10 @@ export default function AwaitedApp() {
                           {r.note && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{r.note}</div>}
                           {r.comments.length > 0 && (
                             <div style={{ marginTop: 8 }}>
-                              {r.comments.map((c, ci) => (
-                                <div key={ci} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "#64748B", marginBottom: 4 }}>
+                              {r.comments.map((c) => (
+                                <div key={c.id} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 12, color: "#64748B", marginBottom: 4 }}>
                                   <span style={{ flex: 1 }}>💬 {c.text} <span style={{ color: "#475569" }}>({c.time})</span></span>
-                                  <button onClick={() => handleDeleteComment(r.id, ci)} style={{ background: "none", border: "none", color: "#DC2626", fontSize: 11, cursor: "pointer", padding: "2px 6px", flexShrink: 0, opacity: 0.6 }}
+                                  <button onClick={() => handleDeleteComment(c.id)} style={{ background: "none", border: "none", color: "#DC2626", fontSize: 11, cursor: "pointer", padding: "2px 6px", flexShrink: 0, opacity: 0.6 }}
                                     onMouseOver={e => e.target.style.opacity = 1} onMouseOut={e => e.target.style.opacity = 0.6}>del</button>
                                 </div>
                               ))}
@@ -296,7 +377,7 @@ export default function AwaitedApp() {
                           )}
                         </div>
                         <div style={{ display: "flex", flexDirection: "column", gap: 4, flexShrink: 0 }}>
-                          <AdminBtn onClick={() => handleToggleHide(r.id)} color={r.hidden ? "#059669" : "#D97706"}>{r.hidden ? "Unhide" : "Hide"}</AdminBtn>
+                          <AdminBtn onClick={() => handleToggleHide(r.id, !r.hidden)} color={r.hidden ? "#059669" : "#D97706"}>{r.hidden ? "Unhide" : "Hide"}</AdminBtn>
                           <AdminBtn onClick={() => handleDelete(r.id)} color="#DC2626">Delete</AdminBtn>
                         </div>
                       </div>
@@ -471,7 +552,7 @@ export default function AwaitedApp() {
                           </div>
                           <div style={{ display: "flex", gap: 4 }}>
                             <AdminBtn onClick={() => addManualVerifiedScholarship(r.scholarship)} color="#059669" small>Verify Name</AdminBtn>
-                            <AdminBtn onClick={() => handleToggleHide(r.id)} color="#D97706" small>Hide</AdminBtn>
+                            <AdminBtn onClick={() => handleToggleHide(r.id, true)} color="#D97706" small>Hide</AdminBtn>
                           </div>
                         </div>
                       ))}
@@ -525,7 +606,7 @@ export default function AwaitedApp() {
                 {filtered.map(r => (
                   <ResultCard key={r.id} result={r} expanded={expandedCard === r.id} onToggle={() => setExpandedCard(expandedCard === r.id ? null : r.id)} onScholarshipClick={openScholarship}
                     commentText={newComments[r.id] || ""} onCommentChange={(val) => setNewComments(prev => ({ ...prev, [r.id]: val }))} onCommentSubmit={(text) => handleAddComment(r.id, text)}
-                    isAdmin={isAdmin} onToggleHide={() => handleToggleHide(r.id)} onDelete={() => handleDelete(r.id)} verified={isVerifiedScholarship(r.scholarship)} />
+                    isAdmin={isAdmin} onToggleHide={() => handleToggleHide(r.id, !r.hidden)} onDelete={() => handleDelete(r.id)} verified={isVerifiedScholarship(r.scholarship)} />
                 ))}
               </div>
             )}
@@ -675,8 +756,8 @@ function ResultCard({ result: r, expanded, onToggle, onScholarshipClick, comment
 
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Discussion ({r.comments.length})</div>
-            {r.comments.map((c, i) => (
-              <div key={`${c.time}-${i}`} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
+            {r.comments.map((c) => (
+              <div key={c.id} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
                 <span style={{ color: "#64748B", fontSize: 11 }}>Anonymous · {c.time}</span>
                 <div style={{ marginTop: 4 }}>{c.text}</div>
               </div>
@@ -884,7 +965,7 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
         {[...entries].sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => (
           <ResultCard key={r.id} result={r} expanded={expandedCard === r.id} onToggle={() => setExpandedCard(expandedCard === r.id ? null : r.id)} onScholarshipClick={() => {}}
             commentText={newComments[r.id] || ""} onCommentChange={(val) => setNewComments(prev => ({ ...prev, [r.id]: val }))} onCommentSubmit={(text) => onCommentSubmit(r.id, text)}
-            isAdmin={isAdmin} onToggleHide={() => onToggleHide(r.id)} onDelete={() => onDelete(r.id)} verified={verified} />
+            isAdmin={isAdmin} onToggleHide={() => onToggleHide(r.id, !r.hidden)} onDelete={() => onDelete(r.id)} verified={verified} />
         ))}
       </div>
     </div>

@@ -30,7 +30,7 @@ Users anonymously report their scholarship application outcomes (Applied → Int
 |-------|-----------|-------|
 | Frontend | React 18 + Vite | Fast dev server, optimized builds |
 | Hosting | Vercel (planned) | Auto-deploys from GitHub |
-| Database | Supabase (planned) | PostgreSQL + REST API + Auth |
+| Database | Supabase | PostgreSQL + Edge Functions |
 | Styling | Inline styles | No CSS framework dependency |
 
 ---
@@ -59,14 +59,59 @@ npm run dev
 The app will be running at `http://localhost:5173`.
 
 ### Persistence
-Awaited now persists submissions, comments, moderation changes, and verified scholarship names in browser local storage by default, so the beta no longer resets on refresh.
+Awaited now has two data modes:
 
-This is still local-only persistence. For a public multi-user launch, you should replace it with a shared backend such as Supabase.
+- **Supabase mode** — shared backend for all users when `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured
+- **Browser-local fallback** — local persistence when Supabase is not configured
+
+The browser-local mode keeps the app usable during setup, but real multi-user data requires Supabase mode. If Supabase is configured but temporarily unreachable, the app now falls back clearly and tells you that the current session is local-only.
 
 ### Admin access
 Click the **Admin** button in the top-right corner and enter the password: `scholar2026`
 
-(This will move to proper Supabase Auth in Phase 2.)
+In browser-local fallback, this uses `VITE_ADMIN_PASSWORD`.
+
+In Supabase mode, moderation is routed through the `admin-actions` Edge Function and should use the server-side `AWAITED_ADMIN_PASSWORD` secret.
+
+### Supabase Setup
+1. Create a Supabase project.
+2. Run the SQL in [supabase/schema.sql](/Users/abdulbaari/Scholartrack/supabase/schema.sql) in the Supabase SQL editor.
+3. Optionally run [supabase/seed.sql](/Users/abdulbaari/Scholartrack/supabase/seed.sql) if you want the shared backend to start with the same beta sample reports as the frontend fallback.
+4. Deploy the moderation Edge Function from [supabase/functions/admin-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/admin-actions/index.ts).
+   The bundled [supabase/config.toml](/Users/abdulbaari/Scholartrack/supabase/config.toml) already disables JWT verification for this beta password-based moderation flow.
+5. Set the Edge Function secret `AWAITED_ADMIN_PASSWORD` to your real admin password.
+6. Create `.env.local` from `.env.example` and fill in:
+
+```bash
+VITE_SUPABASE_URL=your-project-url
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_SUPABASE_ADMIN_FUNCTION=admin-actions
+```
+
+7. Restart the dev server.
+
+When those env vars are present, Awaited switches from browser-local storage to the shared Supabase backend automatically. Realtime updates are enabled for results, comments, and verified scholarship names.
+
+### Vercel Deployment
+Your frontend stays on Vercel. The backend lives in Supabase.
+
+1. Keep deploying the React app to Vercel as usual.
+2. In Vercel project settings, add:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_SUPABASE_ADMIN_FUNCTION=admin-actions`
+3. Redeploy the site.
+
+Once those env vars are present in Vercel, the deployed frontend will use the shared Supabase backend instead of browser-local storage.
+
+### Abuse Controls
+The current backend now enforces a few guardrails directly in Postgres:
+
+- results and comments have length limits
+- links are blocked in public notes and comments
+- realtime is enabled so moderation changes propagate quickly
+
+This is still a beta moderation stack. You should add proper rate limiting and CAPTCHA before a wider launch.
 
 ---
 
@@ -79,7 +124,11 @@ awaited/
 ├── src/
 │   ├── components/       # (Phase 2: extracted components)
 │   ├── lib/
-│   │   └── constants.js  # Statuses, levels, verified list, seed data
+│   │   ├── appDataStore.js
+│   │   ├── constants.js
+│   │   ├── contentPolicy.js
+│   │   ├── persistence.js
+│   │   └── supabaseClient.js
 │   ├── App.jsx           # Main application component
 │   ├── main.jsx          # React entry point
 │   └── index.css         # Global styles and reset
@@ -89,6 +138,11 @@ awaited/
 ├── LICENSE               # MIT License
 ├── package.json
 ├── README.md
+├── supabase/
+│   ├── config.toml
+│   ├── schema.sql
+│   ├── seed.sql
+│   └── functions/
 └── vite.config.js
 ```
 
@@ -106,9 +160,9 @@ awaited/
 
 ### Phase 2 — Backend (Supabase)
 - [ ] Set up Supabase project and database tables
-- [ ] Replace in-memory state with Supabase API calls
+- [x] Replace local-only state with Supabase-backed API calls plus browser-local fallback
 - [ ] Move admin auth to Supabase Auth
-- [ ] Real-time updates via Supabase subscriptions
+- [x] Real-time updates via Supabase subscriptions
 
 ### Phase 3 — Deploy
 - [ ] Connect GitHub repo to Vercel

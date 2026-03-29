@@ -8,6 +8,8 @@ dist/
 .env
 .env.local
 .env.production
+.vercel/
+supabase/.temp/
 
 # OS files
 .DS_Store
@@ -20,3 +22,4 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+.vercel

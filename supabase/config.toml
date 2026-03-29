@@ -1,0 +1,4 @@
+project_id = "your-supabase-project-ref"
+
+[functions.admin-actions]
+verify_jwt = false

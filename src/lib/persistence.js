@@ -7,12 +7,11 @@ import {
 
 const STORAGE_KEY = "awaited:app-data:v1";
 
-export const PERSISTENCE_MODE = "browser-local";
-
-function normalizeComments(comments = []) {
+function normalizeComments(comments = [], resultId = "result") {
   return comments
     .filter((comment) => comment && typeof comment.text === "string")
-    .map((comment) => ({
+    .map((comment, index) => ({
+      id: comment.id ?? `local-comment-${resultId}-${index}`,
       text: comment.text,
       time: comment.time || new Date().toISOString().split("T")[0],
     }));
@@ -21,10 +20,11 @@ function normalizeComments(comments = []) {
 function normalizeResults(results = []) {
   return results
     .filter((result) => result && typeof result.scholarship === "string")
-    .map((result) => ({
+    .map((result, index) => ({
       ...result,
+      id: result.id ?? `local-result-${index}`,
       scholarship: getCanonicalScholarshipName(result.scholarship),
-      comments: normalizeComments(result.comments),
+      comments: normalizeComments(result.comments, result.id ?? `local-result-${index}`),
       hidden: Boolean(result.hidden),
       createdAt: result.createdAt || new Date().toISOString(),
     }));
@@ -47,6 +47,10 @@ export function normalizeAppData(appData = {}) {
     verifiedList: manualVerified,
     customScholarships: customScholarships.filter((name) => !manualVerified.includes(name)),
   };
+}
+
+export function getDefaultAppData() {
+  return normalizeAppData();
 }
 
 export function loadPersistedAppData() {

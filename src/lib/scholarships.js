@@ -31,6 +31,10 @@ export function normalizeScholarshipName(value = "") {
     .toLowerCase();
 }
 
+export function scholarshipToSlug(name = "") {
+  return normalizeScholarshipName(name).replace(/\s+/g, "-");
+}
+
 export function sortScholarshipNames(names = []) {
   return [...new Set(names.map((name) => name.trim()).filter(Boolean))].sort((a, b) =>
     a.localeCompare(b, undefined, { sensitivity: "base" }),
@@ -73,6 +77,14 @@ export function getScholarshipRecord(name) {
   return databaseLookup.get(normalizeScholarshipName(name)) || null;
 }
 
+export function getScholarshipRecordBySlug(slug) {
+  if (!slug?.trim()) {
+    return null;
+  }
+
+  return DATABASE_SCHOLARSHIPS.find((record) => scholarshipToSlug(record.name) === slug) || null;
+}
+
 export function getCanonicalScholarshipName(name) {
   const trimmedName = name?.trim();
   if (!trimmedName) {
@@ -99,6 +111,14 @@ export function findMatchingScholarshipName(name, candidateNames = []) {
 export function removeScholarshipName(names = [], targetName) {
   const lookupName = normalizeScholarshipName(targetName);
   return sortScholarshipNames(names.filter((name) => normalizeScholarshipName(name) !== lookupName));
+}
+
+export function findScholarshipNameBySlug(slug, candidateNames = []) {
+  if (!slug?.trim()) {
+    return null;
+  }
+
+  return candidateNames.find((candidate) => scholarshipToSlug(candidate) === slug) || null;
 }
 
 export function buildScholarshipSuggestions(

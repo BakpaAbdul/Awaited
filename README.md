@@ -17,7 +17,8 @@ Users anonymously report their scholarship application outcomes (Applied → Int
 - **Discussion threads** — comment anonymously on any result to ask questions or share tips.
 
 ### For admins
-- **Password-protected admin panel** — accessible from within the app.
+- **Supabase Auth admin login** — real email/password session instead of a browser-only shared password.
+- **Moderation queue** — pending results and comments can be approved, rejected, hidden, or deleted.
 - **Content moderation** — hide spam/fake submissions, delete entries, remove individual comments.
 - **Analytics dashboard** — status distribution, top scholarships, submissions by month, country and level breakdowns.
 - **Verified scholarship list** — manage a canonical list of scholarship names. Submissions with unverified names are flagged for review. The submit form autocompletes from the verified list.
@@ -67,30 +68,35 @@ Awaited now has two data modes:
 The browser-local mode keeps the app usable during setup, but real multi-user data requires Supabase mode. If Supabase is configured but temporarily unreachable, the app now falls back clearly and tells you that the current session is local-only.
 
 ### Admin access
-Click the **Admin** button in the top-right corner and enter the password: `scholar2026`
+Awaited now supports two admin modes:
+
+- **Supabase mode** — real admin sign-in through Supabase Auth
+- **Browser-local fallback** — local password only for offline/dev fallback
 
 In browser-local fallback, this uses `VITE_ADMIN_PASSWORD`.
 
-In Supabase mode, moderation is routed through the `admin-actions` Edge Function and should use the server-side `AWAITED_ADMIN_PASSWORD` secret.
+In Supabase mode, moderation routes through the authenticated `admin-actions` Edge Function.
 
 ### Supabase Setup
 1. Create a Supabase project.
 2. Run the SQL in [supabase/schema.sql](/Users/abdulbaari/Scholartrack/supabase/schema.sql) in the Supabase SQL editor.
 3. Optionally run [supabase/seed.sql](/Users/abdulbaari/Scholartrack/supabase/seed.sql) if you want the shared backend to start with the same beta sample reports as the frontend fallback.
 4. Deploy the moderation Edge Function from [supabase/functions/admin-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/admin-actions/index.ts).
-   The bundled [supabase/config.toml](/Users/abdulbaari/Scholartrack/supabase/config.toml) already disables JWT verification for this beta password-based moderation flow.
-5. Set the Edge Function secret `AWAITED_ADMIN_PASSWORD` to your real admin password.
+5. Deploy the public posting Edge Function from [supabase/functions/public-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/public-actions/index.ts).
 6. Create `.env.local` from `.env.example` and fill in:
 
 ```bash
 VITE_SUPABASE_URL=your-project-url
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_SUPABASE_ADMIN_FUNCTION=admin-actions
+VITE_SUPABASE_PUBLIC_FUNCTION=public-actions
+VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key
 ```
 
-7. Restart the dev server.
+7. Set the Supabase secret `TURNSTILE_SECRET_KEY` if you want real CAPTCHA verification.
+8. Restart the dev server.
 
-When those env vars are present, Awaited switches from browser-local storage to the shared Supabase backend automatically. Realtime updates are enabled for results, comments, and verified scholarship names.
+When those env vars are present, Awaited switches from browser-local storage to the shared Supabase backend automatically. Realtime updates are enabled for results, comments, moderation queue state, and verified scholarship names.
 
 ### Vercel Deployment
 Your frontend stays on Vercel. The backend lives in Supabase.
@@ -100,18 +106,22 @@ Your frontend stays on Vercel. The backend lives in Supabase.
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_SUPABASE_ADMIN_FUNCTION=admin-actions`
+   - `VITE_SUPABASE_PUBLIC_FUNCTION=public-actions`
+   - `VITE_TURNSTILE_SITE_KEY=your-turnstile-site-key`
 3. Redeploy the site.
 
 Once those env vars are present in Vercel, the deployed frontend will use the shared Supabase backend instead of browser-local storage.
 
 ### Abuse Controls
-The current backend now enforces a few guardrails directly in Postgres:
+The current backend now enforces several public-posting controls:
 
-- results and comments have length limits
-- links are blocked in public notes and comments
-- realtime is enabled so moderation changes propagate quickly
+- anonymous posting goes through `public-actions` instead of direct table inserts
+- suspicious results/comments can be auto-queued as `pending`
+- rate limits apply to repeated submissions from the same browser fingerprint
+- links and noisy spam patterns are blocked in public notes and comments
+- Turnstile can be enabled with `VITE_TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`
 
-This is still a beta moderation stack. You should add proper rate limiting and CAPTCHA before a wider launch.
+You should still replace any test Turnstile keys with real ones before a wider launch.
 
 ---
 
@@ -125,9 +135,11 @@ awaited/
 │   ├── components/       # (Phase 2: extracted components)
 │   ├── lib/
 │   │   ├── appDataStore.js
+│   │   ├── clientIdentity.js
 │   │   ├── constants.js
 │   │   ├── contentPolicy.js
 │   │   ├── persistence.js
+│   │   ├── router.js
 │   │   └── supabaseClient.js
 │   ├── App.jsx           # Main application component
 │   ├── main.jsx          # React entry point
@@ -143,6 +155,8 @@ awaited/
 │   ├── schema.sql
 │   ├── seed.sql
 │   └── functions/
+│       ├── admin-actions/
+│       └── public-actions/
 └── vite.config.js
 ```
 
@@ -161,8 +175,9 @@ awaited/
 ### Phase 2 — Backend (Supabase)
 - [ ] Set up Supabase project and database tables
 - [x] Replace local-only state with Supabase-backed API calls plus browser-local fallback
-- [ ] Move admin auth to Supabase Auth
+- [x] Move admin auth to Supabase Auth
 - [x] Real-time updates via Supabase subscriptions
+- [x] Add moderation queue and posting throttles
 
 ### Phase 3 — Deploy
 - [ ] Connect GitHub repo to Vercel

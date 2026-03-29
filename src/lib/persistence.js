@@ -14,6 +14,9 @@ function normalizeComments(comments = [], resultId = "result") {
       id: comment.id ?? `local-comment-${resultId}-${index}`,
       text: comment.text,
       time: comment.time || new Date().toISOString().split("T")[0],
+      createdAt: comment.createdAt || new Date().toISOString(),
+      reviewState: comment.reviewState || "approved",
+      moderationReason: comment.moderationReason || "",
     }));
 }
 
@@ -26,6 +29,8 @@ function normalizeResults(results = []) {
       scholarship: getCanonicalScholarshipName(result.scholarship),
       comments: normalizeComments(result.comments, result.id ?? `local-result-${index}`),
       hidden: Boolean(result.hidden),
+      reviewState: result.reviewState || "approved",
+      moderationReason: result.moderationReason || "",
       createdAt: result.createdAt || new Date().toISOString(),
     }));
 }

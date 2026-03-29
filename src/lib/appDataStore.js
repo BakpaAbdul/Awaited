@@ -1,5 +1,6 @@
 import { getDefaultAppData, loadPersistedAppData, normalizeAppData, persistAppData } from "./persistence";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
+import { getClientFingerprint } from "./clientIdentity";
 import { sanitizeComment, sanitizeScholarshipName, sanitizeSubmission } from "./contentPolicy";
 import {
   findMatchingScholarshipName,
@@ -11,7 +12,9 @@ import {
 const RESULTS_TABLE = "scholarship_results";
 const COMMENTS_TABLE = "scholarship_comments";
 const VERIFIED_TABLE = "verified_scholarships";
+const ADMIN_RPC = "current_user_is_admin";
 const ADMIN_FUNCTION = import.meta.env.VITE_SUPABASE_ADMIN_FUNCTION || "admin-actions";
+const PUBLIC_FUNCTION = import.meta.env.VITE_SUPABASE_PUBLIC_FUNCTION || "public-actions";
 const LOCAL_ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "scholar2026";
 
 export const DATA_BACKEND_MODE = isSupabaseConfigured ? "supabase" : "browser-local";
@@ -33,8 +36,12 @@ function buildResultPayload(entry) {
 function mapCommentRow(row) {
   return {
     id: row.id,
+    resultId: row.result_id,
     text: row.text,
     time: row.created_at?.split("T")[0] || new Date().toISOString().split("T")[0],
+    createdAt: row.created_at || new Date().toISOString(),
+    reviewState: row.review_state || "approved",
+    moderationReason: row.moderation_reason || "",
   };
 }
 
@@ -51,30 +58,14 @@ function mapResultRow(row, comments = []) {
     gpa: row.gpa || "",
     note: row.note || "",
     hidden: Boolean(row.hidden),
+    reviewState: row.review_state || "approved",
+    moderationReason: row.moderation_reason || "",
     createdAt: row.created_at,
     comments,
   };
 }
 
-function withLocalMutation(mutator) {
-  const current = loadPersistedAppData();
-  const next = normalizeAppData(mutator(current));
-  persistAppData(next);
-  return next;
-}
-
-async function loadSupabaseAppData() {
-  const [{ data: resultRows, error: resultsError }, { data: commentRows, error: commentsError }, { data: verifiedRows, error: verifiedError }] =
-    await Promise.all([
-      supabase.from(RESULTS_TABLE).select("*").order("created_at", { ascending: false }),
-      supabase.from(COMMENTS_TABLE).select("*").order("created_at", { ascending: true }),
-      supabase.from(VERIFIED_TABLE).select("name").order("name", { ascending: true }),
-    ]);
-
-  if (resultsError) throw resultsError;
-  if (commentsError) throw commentsError;
-  if (verifiedError) throw verifiedError;
-
+function buildAppDataFromRows(resultRows = [], commentRows = [], verifiedRows = []) {
   const commentsByResult = new Map();
   (commentRows || []).forEach((row) => {
     const comments = commentsByResult.get(row.result_id) || [];
@@ -84,8 +75,75 @@ async function loadSupabaseAppData() {
 
   return normalizeAppData({
     results: (resultRows || []).map((row) => mapResultRow(row, commentsByResult.get(row.id) || [])),
-    verifiedList: (verifiedRows || []).map((row) => row.name),
+    verifiedList: (verifiedRows || [])
+      .filter((row) => (row.source || "manual") === "manual")
+      .map((row) => row.name),
   });
+}
+
+function withLocalMutation(mutator) {
+  const current = loadPersistedAppData();
+  const next = normalizeAppData(mutator(current));
+  persistAppData(next);
+  return next;
+}
+
+async function getAuthHeaders() {
+  if (!supabase) {
+    return undefined;
+  }
+
+  const { data } = await supabase.auth.getSession();
+  const accessToken = data.session?.access_token;
+
+  if (!accessToken) {
+    return undefined;
+  }
+
+  return {
+    Authorization: `Bearer ${accessToken}`,
+  };
+}
+
+async function invokeFunction(functionName, body, { withAuth = false } = {}) {
+  const headers = withAuth ? await getAuthHeaders() : undefined;
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body,
+    headers,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  if (data?.error) {
+    throw new Error(data.error);
+  }
+
+  return data;
+}
+
+async function loadSupabaseAppData({ admin = false } = {}) {
+  const resultsQuery = supabase.from(RESULTS_TABLE).select("*").order("created_at", { ascending: false });
+  const commentsQuery = supabase.from(COMMENTS_TABLE).select("*").order("created_at", { ascending: true });
+
+  if (!admin) {
+    resultsQuery.eq("review_state", "approved").eq("hidden", false);
+    commentsQuery.eq("review_state", "approved");
+  }
+
+  const [{ data: resultRows, error: resultsError }, { data: commentRows, error: commentsError }, { data: verifiedRows, error: verifiedError }] =
+    await Promise.all([
+      resultsQuery,
+      commentsQuery,
+      supabase.from(VERIFIED_TABLE).select("name, source").order("name", { ascending: true }),
+    ]);
+
+  if (resultsError) throw resultsError;
+  if (commentsError) throw commentsError;
+  if (verifiedError) throw verifiedError;
+
+  return buildAppDataFromRows(resultRows, commentRows, verifiedRows);
 }
 
 function formatFallbackMessage(error) {
@@ -93,23 +151,34 @@ function formatFallbackMessage(error) {
   return `Supabase is unavailable right now. Using browser-local fallback on this device. (${detail})`;
 }
 
-async function invokeAdminAction(action, payload = {}) {
-  const { data, error } = await supabase.functions.invoke(ADMIN_FUNCTION, {
-    body: { action, ...payload },
-  });
+async function isCurrentUserAdmin() {
+  if (!isSupabaseConfigured || !supabase) {
+    return false;
+  }
 
-  if (error) throw error;
-  if (data?.error) throw new Error(data.error);
-  return data;
+  const { data, error } = await supabase.rpc(ADMIN_RPC);
+  if (error) {
+    throw error;
+  }
+
+  return Boolean(data);
 }
 
-async function loadAppData() {
+async function loadPublicAppData() {
+  return loadSupabaseAppData({ admin: false });
+}
+
+async function loadAdminAppData() {
+  return loadSupabaseAppData({ admin: true });
+}
+
+async function loadAppData({ admin = false } = {}) {
   if (!isSupabaseConfigured) {
     return loadPersistedAppData();
   }
 
   try {
-    return await loadSupabaseAppData();
+    return admin ? await loadAdminAppData() : await loadPublicAppData();
   } catch (error) {
     console.error("Falling back to browser-local data because Supabase load failed.", error);
     return loadPersistedAppData();
@@ -122,14 +191,20 @@ async function hydrateAppData() {
       activeMode: "browser-local",
       appData: loadPersistedAppData(),
       syncError: "",
+      admin: null,
     };
   }
 
   try {
+    const { data } = await supabase.auth.getSession();
+    const hasSession = Boolean(data.session);
+    const admin = hasSession && await isCurrentUserAdmin();
+
     return {
       activeMode: "supabase",
-      appData: await loadSupabaseAppData(),
+      appData: admin ? await loadAdminAppData() : await loadPublicAppData(),
       syncError: "",
+      admin: admin ? { email: data.session?.user?.email || "admin@awaited.local" } : null,
     };
   } catch (error) {
     console.error("Falling back to browser-local data because Supabase load failed.", error);
@@ -137,24 +212,72 @@ async function hydrateAppData() {
       activeMode: "browser-local",
       appData: loadPersistedAppData(),
       syncError: formatFallbackMessage(error),
+      admin: null,
     };
   }
 }
 
-async function verifyAdminPassword(password) {
+async function signInAdmin({ email, password }) {
   if (!isSupabaseConfigured) {
-    return password === LOCAL_ADMIN_PASSWORD;
+    if (password !== LOCAL_ADMIN_PASSWORD) {
+      throw new Error("Invalid admin credentials.");
+    }
+
+    return {
+      appData: loadPersistedAppData(),
+      admin: {
+        email: email?.trim() || "local-admin@awaited.local",
+      },
+    };
   }
 
-  const response = await invokeAdminAction("verifyAdminPassword", { adminPassword: password });
-  return Boolean(response?.ok);
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail) {
+    throw new Error("Admin email is required.");
+  }
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizedEmail,
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  const admin = await isCurrentUserAdmin();
+  if (!admin) {
+    await supabase.auth.signOut();
+    throw new Error("This account is not authorized to moderate Awaited.");
+  }
+
+  return {
+    appData: await loadAdminAppData(),
+    admin: {
+      email: data.user?.email || normalizedEmail,
+    },
+  };
 }
 
-async function submitResult(entry) {
+async function signOutAdmin() {
+  if (!isSupabaseConfigured) {
+    return {
+      appData: loadPersistedAppData(),
+      admin: null,
+    };
+  }
+
+  await supabase.auth.signOut();
+  return {
+    appData: await loadPublicAppData(),
+    admin: null,
+  };
+}
+
+async function submitResult(entry, moderation = {}, options = {}) {
   const sanitizedEntry = sanitizeSubmission(entry);
 
   if (!isSupabaseConfigured) {
-    return withLocalMutation((current) => {
+    const nextData = withLocalMutation((current) => {
       const matchedName =
         findMatchingScholarshipName(sanitizedEntry.scholarship, [...current.verifiedList, ...(current.customScholarships || [])]) ||
         getCanonicalScholarshipName(sanitizedEntry.scholarship);
@@ -171,6 +294,8 @@ async function submitResult(entry) {
             scholarship: matchedName,
             comments: [],
             hidden: false,
+            reviewState: "approved",
+            moderationReason: "",
             createdAt: new Date().toISOString(),
           },
           ...current.results,
@@ -178,18 +303,41 @@ async function submitResult(entry) {
         customScholarships: nextCustomScholarships,
       };
     });
+
+    return {
+      appData: nextData,
+      meta: { reviewState: "approved" },
+    };
   }
 
-  const { error } = await supabase.from(RESULTS_TABLE).insert(buildResultPayload(sanitizedEntry));
-  if (error) throw error;
-  return loadSupabaseAppData();
+  const response = await invokeFunction(
+    PUBLIC_FUNCTION,
+    {
+      action: "submitResult",
+      entry: buildResultPayload(sanitizedEntry),
+      meta: {
+        fingerprint: getClientFingerprint(),
+        honeypot: moderation.honeypot || "",
+        captchaToken: moderation.captchaToken || "",
+      },
+    },
+    { withAuth: false },
+  );
+
+  return {
+    appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
+    meta: {
+      reviewState: response?.reviewState || "approved",
+      moderationReason: response?.moderationReason || "",
+    },
+  };
 }
 
-async function addComment(resultId, text) {
+async function addComment(resultId, text, moderation = {}, options = {}) {
   const sanitizedText = sanitizeComment(text);
 
   if (!isSupabaseConfigured) {
-    return withLocalMutation((current) => ({
+    const nextData = withLocalMutation((current) => ({
       ...current,
       results: current.results.map((result) =>
         result.id === resultId
@@ -201,23 +349,52 @@ async function addComment(resultId, text) {
                   id: `local-comment-${resultId}-${Date.now()}`,
                   text: sanitizedText,
                   time: new Date().toISOString().split("T")[0],
+                  createdAt: new Date().toISOString(),
+                  reviewState: "approved",
+                  moderationReason: "",
                 },
               ],
             }
           : result,
       ),
     }));
+
+    return {
+      appData: nextData,
+      meta: { reviewState: "approved" },
+    };
   }
 
-  const { error } = await supabase.from(COMMENTS_TABLE).insert({
-    result_id: resultId,
-    text: sanitizedText,
-  });
-  if (error) throw error;
-  return loadSupabaseAppData();
+  const response = await invokeFunction(
+    PUBLIC_FUNCTION,
+    {
+      action: "addComment",
+      resultId,
+      text: sanitizedText,
+      meta: {
+        fingerprint: getClientFingerprint(),
+        honeypot: moderation.honeypot || "",
+        captchaToken: moderation.captchaToken || "",
+      },
+    },
+    { withAuth: false },
+  );
+
+  return {
+    appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
+    meta: {
+      reviewState: response?.reviewState || "approved",
+      moderationReason: response?.moderationReason || "",
+    },
+  };
 }
 
-async function setResultHidden(resultId, hidden, adminPassword) {
+async function invokeAdminMutation(action, payload = {}) {
+  await invokeFunction(ADMIN_FUNCTION, { action, ...payload }, { withAuth: true });
+  return loadAdminAppData();
+}
+
+async function setResultHidden(resultId, hidden) {
   if (!isSupabaseConfigured) {
     return withLocalMutation((current) => ({
       ...current,
@@ -225,11 +402,10 @@ async function setResultHidden(resultId, hidden, adminPassword) {
     }));
   }
 
-  await invokeAdminAction("setResultHidden", { adminPassword, resultId, hidden });
-  return loadSupabaseAppData();
+  return invokeAdminMutation("setResultHidden", { resultId, hidden });
 }
 
-async function deleteResult(resultId, adminPassword) {
+async function deleteResult(resultId) {
   if (!isSupabaseConfigured) {
     return withLocalMutation((current) => ({
       ...current,
@@ -237,11 +413,10 @@ async function deleteResult(resultId, adminPassword) {
     }));
   }
 
-  await invokeAdminAction("deleteResult", { adminPassword, resultId });
-  return loadSupabaseAppData();
+  return invokeAdminMutation("deleteResult", { resultId });
 }
 
-async function deleteComment(commentId, adminPassword) {
+async function deleteComment(commentId) {
   if (!isSupabaseConfigured) {
     return withLocalMutation((current) => ({
       ...current,
@@ -252,11 +427,39 @@ async function deleteComment(commentId, adminPassword) {
     }));
   }
 
-  await invokeAdminAction("deleteComment", { adminPassword, commentId });
-  return loadSupabaseAppData();
+  return invokeAdminMutation("deleteComment", { commentId });
 }
 
-async function addVerifiedScholarship(name, adminPassword) {
+async function setResultReviewState(resultId, reviewState, moderationReason = "") {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      results: current.results.map((result) =>
+        result.id === resultId ? { ...result, reviewState, moderationReason } : result,
+      ),
+    }));
+  }
+
+  return invokeAdminMutation("setResultReviewState", { resultId, reviewState, moderationReason });
+}
+
+async function setCommentReviewState(commentId, reviewState, moderationReason = "") {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      results: current.results.map((result) => ({
+        ...result,
+        comments: result.comments.map((comment) =>
+          comment.id === commentId ? { ...comment, reviewState, moderationReason } : comment,
+        ),
+      })),
+    }));
+  }
+
+  return invokeAdminMutation("setCommentReviewState", { commentId, reviewState, moderationReason });
+}
+
+async function addVerifiedScholarship(name) {
   const canonicalName = getCanonicalScholarshipName(sanitizeScholarshipName(name));
 
   if (!isSupabaseConfigured) {
@@ -269,11 +472,10 @@ async function addVerifiedScholarship(name, adminPassword) {
     }));
   }
 
-  await invokeAdminAction("addVerifiedScholarship", { adminPassword, name: canonicalName });
-  return loadSupabaseAppData();
+  return invokeAdminMutation("addVerifiedScholarship", { name: canonicalName });
 }
 
-async function removeVerifiedScholarship(name, adminPassword) {
+async function removeVerifiedScholarship(name) {
   if (!isSupabaseConfigured) {
     return withLocalMutation((current) => ({
       ...current,
@@ -281,39 +483,39 @@ async function removeVerifiedScholarship(name, adminPassword) {
     }));
   }
 
-  await invokeAdminAction("removeVerifiedScholarship", { adminPassword, name });
-  return loadSupabaseAppData();
+  return invokeAdminMutation("removeVerifiedScholarship", { name });
 }
 
-function subscribeToAppData(onData, onError) {
+function subscribeToAppData({ admin = false } = {}, onData, onError) {
   if (!isSupabaseConfigured || !supabase) {
     return () => {};
   }
 
   let active = true;
   let reloadTimer = null;
+  const loadCurrent = async () => {
+    try {
+      const nextData = await loadSupabaseAppData({ admin });
+      if (active) {
+        onData(nextData);
+      }
+    } catch (error) {
+      if (active) {
+        onError?.(error);
+      }
+    }
+  };
 
   const scheduleReload = () => {
     if (reloadTimer) {
       clearTimeout(reloadTimer);
     }
 
-    reloadTimer = setTimeout(async () => {
-      try {
-        const nextData = await loadSupabaseAppData();
-        if (active) {
-          onData(nextData);
-        }
-      } catch (error) {
-        if (active) {
-          onError?.(error);
-        }
-      }
-    }, 150);
+    reloadTimer = setTimeout(loadCurrent, 150);
   };
 
   const channel = supabase
-    .channel("awaited-app-data")
+    .channel(admin ? "awaited-admin-data" : "awaited-public-data")
     .on("postgres_changes", { event: "*", schema: "public", table: RESULTS_TABLE }, scheduleReload)
     .on("postgres_changes", { event: "*", schema: "public", table: COMMENTS_TABLE }, scheduleReload)
     .on("postgres_changes", { event: "*", schema: "public", table: VERIFIED_TABLE }, scheduleReload)
@@ -348,13 +550,19 @@ export const appDataStore = {
   },
   hydrateAppData,
   loadAppData,
+  loadAdminAppData,
+  loadPublicAppData,
+  signInAdmin,
+  signOutAdmin,
+  isCurrentUserAdmin,
   subscribeToAppData,
-  verifyAdminPassword,
   submitResult,
   addComment,
   setResultHidden,
   deleteResult,
   deleteComment,
+  setResultReviewState,
+  setCommentReviewState,
   addVerifiedScholarship,
   removeVerifiedScholarship,
 };

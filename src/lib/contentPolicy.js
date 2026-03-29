@@ -41,6 +41,43 @@ function compareDates(left, right) {
   return new Date(`${left}T00:00:00Z`).getTime() - new Date(`${right}T00:00:00Z`).getTime();
 }
 
+function addError(errors, field, message) {
+  if (!errors[field]) {
+    errors[field] = message;
+  }
+}
+
+function validateRequired(errors, field, value, label) {
+  if (!value) {
+    addError(errors, field, `${label} is required.`);
+  }
+}
+
+function validateMaxLength(errors, field, value, maxLength, label) {
+  if (value && value.length > maxLength) {
+    addError(errors, field, `${label} must be ${maxLength} characters or fewer.`);
+  }
+}
+
+function validateNoLinks(errors, field, value, label) {
+  if (value && URL_PATTERN.test(value)) {
+    addError(errors, field, `${label} cannot include links right now.`);
+  }
+}
+
+function validateDate(errors, field, value, label, { required = false } = {}) {
+  if (!value) {
+    if (required) {
+      addError(errors, field, `${label} is required.`);
+    }
+    return;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(new Date(`${value}T00:00:00Z`).getTime())) {
+    addError(errors, field, `${label} must be a valid date.`);
+  }
+}
+
 export function sanitizeScholarshipName(name) {
   const sanitized = cleanText(name);
 
@@ -129,6 +166,91 @@ export function sanitizeSubmission(entry = {}) {
   return sanitized;
 }
 
+export function validateSubmissionDraft(entry = {}, { requiresCaptcha = false, captchaToken = "" } = {}) {
+  const errors = {};
+  const normalized = {
+    scholarship: cleanText(entry.scholarship),
+    cycleYear: cleanText(entry.cycleYear),
+    country: cleanText(entry.country),
+    level: cleanText(entry.level),
+    field: cleanText(entry.field),
+    university: cleanText(entry.university),
+    program: cleanText(entry.program),
+    applicationRound: cleanText(entry.applicationRound),
+    status: cleanText(entry.status),
+    date: cleanText(entry.date),
+    appliedDate: cleanText(entry.appliedDate),
+    interviewDate: cleanText(entry.interviewDate),
+    finalDecisionDate: cleanText(entry.finalDecisionDate),
+    nationality: cleanText(entry.nationality),
+    gpa: cleanText(entry.gpa),
+    note: cleanText(entry.note),
+  };
+
+  validateRequired(errors, "scholarship", normalized.scholarship, "Scholarship name");
+  validateRequired(errors, "country", normalized.country, "Country");
+  validateRequired(errors, "status", normalized.status, "Status");
+  validateDate(errors, "date", normalized.date, "Latest update date", { required: true });
+
+  if (normalized.level && !LEVELS.includes(normalized.level)) {
+    addError(errors, "level", "Study level is invalid.");
+  }
+
+  if (normalized.status && !STATUSES.includes(normalized.status)) {
+    addError(errors, "status", "Status is invalid.");
+  }
+
+  validateMaxLength(errors, "scholarship", normalized.scholarship, 160, "Scholarship name");
+  validateMaxLength(errors, "cycleYear", normalized.cycleYear, 32, "Cycle year");
+  validateMaxLength(errors, "country", normalized.country, 120, "Country");
+  validateMaxLength(errors, "field", normalized.field, 160, "Field of study");
+  validateMaxLength(errors, "university", normalized.university, 160, "University");
+  validateMaxLength(errors, "program", normalized.program, 160, "Program");
+  validateMaxLength(errors, "applicationRound", normalized.applicationRound, 80, "Application round");
+  validateMaxLength(errors, "nationality", normalized.nationality, 120, "Nationality");
+  validateMaxLength(errors, "gpa", normalized.gpa, 32, "GPA");
+  validateMaxLength(errors, "note", normalized.note, 1200, "Notes");
+
+  validateNoLinks(errors, "university", normalized.university, "University");
+  validateNoLinks(errors, "program", normalized.program, "Program");
+  validateNoLinks(errors, "applicationRound", normalized.applicationRound, "Application round");
+  validateNoLinks(errors, "note", normalized.note, "Notes");
+
+  validateDate(errors, "appliedDate", normalized.appliedDate, "Applied date");
+  validateDate(errors, "interviewDate", normalized.interviewDate, "Interview date");
+  validateDate(errors, "finalDecisionDate", normalized.finalDecisionDate, "Final decision date");
+
+  if (
+    normalized.appliedDate &&
+    normalized.interviewDate &&
+    compareDates(normalized.interviewDate, normalized.appliedDate) < 0
+  ) {
+    addError(errors, "interviewDate", "Interview date cannot be earlier than applied date.");
+  }
+
+  if (
+    normalized.appliedDate &&
+    normalized.finalDecisionDate &&
+    compareDates(normalized.finalDecisionDate, normalized.appliedDate) < 0
+  ) {
+    addError(errors, "finalDecisionDate", "Final decision date cannot be earlier than applied date.");
+  }
+
+  if (
+    normalized.interviewDate &&
+    normalized.finalDecisionDate &&
+    compareDates(normalized.finalDecisionDate, normalized.interviewDate) < 0
+  ) {
+    addError(errors, "finalDecisionDate", "Final decision date cannot be earlier than interview date.");
+  }
+
+  if (requiresCaptcha && !captchaToken) {
+    addError(errors, "captchaToken", "Complete human verification to submit.");
+  }
+
+  return errors;
+}
+
 export function sanitizeComment(text) {
   const sanitized = cleanText(text);
 
@@ -154,6 +276,24 @@ export function sanitizeForumThread(entry = {}) {
   return sanitized;
 }
 
+export function validateForumThreadDraft(entry = {}, { requiresCaptcha = false, captchaToken = "" } = {}) {
+  const errors = {};
+  const title = cleanText(entry.title);
+  const body = cleanText(entry.body);
+
+  validateRequired(errors, "title", title, "Thread title");
+  validateRequired(errors, "body", body, "Thread body");
+  validateMaxLength(errors, "title", title, 160, "Thread title");
+  validateMaxLength(errors, "body", body, 2400, "Thread body");
+  validateNoLinks(errors, "body", body, "Thread body");
+
+  if (requiresCaptcha && !captchaToken) {
+    addError(errors, "captchaToken", "Complete human verification to create a thread.");
+  }
+
+  return errors;
+}
+
 export function sanitizeForumReply(text) {
   const sanitized = cleanText(text);
 
@@ -162,6 +302,21 @@ export function sanitizeForumReply(text) {
   ensureNoLinks(sanitized, "Reply");
 
   return sanitized;
+}
+
+export function validateForumReplyDraft(text, { requiresCaptcha = false, captchaToken = "" } = {}) {
+  const errors = {};
+  const sanitized = cleanText(text);
+
+  validateRequired(errors, "reply", sanitized, "Reply");
+  validateMaxLength(errors, "reply", sanitized, 1200, "Reply");
+  validateNoLinks(errors, "reply", sanitized, "Reply");
+
+  if (requiresCaptcha && !captchaToken) {
+    addError(errors, "captchaToken", "Complete human verification to post a reply.");
+  }
+
+  return errors;
 }
 
 export function sanitizeBlogPost(entry = {}) {

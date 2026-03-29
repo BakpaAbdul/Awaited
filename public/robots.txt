@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://awaited-orcin.vercel.app/sitemap.xml

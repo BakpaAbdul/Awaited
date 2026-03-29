@@ -1,53 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { buildExcerpt } from "../lib/content";
-import { hasStoredHumanTrust } from "../lib/humanVerification";
 import { THEME, inputStyle, panelStyle, primaryButtonStyle } from "../lib/theme";
-import { loadTurnstileScript } from "../lib/turnstile";
+import { validateForumReplyDraft, validateForumThreadDraft } from "../lib/contentPolicy";
 import { turnstileSiteKey } from "../lib/supabaseClient";
+import { FormField, getInputStateStyle, TurnstileGate } from "./formControls";
 
-function TurnstileGate({ onVerify, resetKey }) {
-  const containerRef = useRef(null);
-  const widgetIdRef = useRef(null);
+import { hasStoredHumanTrust } from "../lib/humanVerification";
 
-  useEffect(() => {
-    if (!turnstileSiteKey || hasStoredHumanTrust() || !containerRef.current) {
-      return undefined;
-    }
-
-    let isActive = true;
-
-    loadTurnstileScript()
-      .then((turnstile) => {
-        if (!isActive || !containerRef.current) {
-          return;
-        }
-
-        containerRef.current.innerHTML = "";
-        widgetIdRef.current = turnstile.render(containerRef.current, {
-          sitekey: turnstileSiteKey,
-          theme: "light",
-          callback: (token) => onVerify(token),
-          "expired-callback": () => onVerify(""),
-          "error-callback": () => onVerify(""),
-        });
-      })
-      .catch(() => onVerify(""));
-
-    return () => {
-      isActive = false;
-      if (widgetIdRef.current && typeof window !== "undefined" && window.turnstile) {
-        window.turnstile.remove(widgetIdRef.current);
-      }
-      widgetIdRef.current = null;
-    };
-  }, [onVerify, resetKey]);
-
-  if (!turnstileSiteKey || hasStoredHumanTrust()) {
-    return null;
-  }
-
-  return <div ref={containerRef} style={{ minHeight: 68 }} />;
-}
+const BLOG_PAGE_SIZE = 8;
+const FORUM_PAGE_SIZE = 10;
 
 function SectionHeader({ eyebrow, title, description, action }) {
   return (
@@ -80,6 +41,13 @@ function ReviewChip({ reviewState, moderationReason }) {
 
 export function BlogIndex({ posts, onOpenPost }) {
   const publishedPosts = posts.filter((post) => post.published);
+  const [visibleCount, setVisibleCount] = useState(BLOG_PAGE_SIZE);
+
+  useEffect(() => {
+    setVisibleCount(BLOG_PAGE_SIZE);
+  }, [publishedPosts.length]);
+
+  const visiblePosts = publishedPosts.slice(0, visibleCount);
 
   return (
     <div>
@@ -97,7 +65,7 @@ export function BlogIndex({ posts, onOpenPost }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          {publishedPosts.map((post) => (
+          {visiblePosts.map((post) => (
             <button
               key={post.id}
               onClick={() => onOpenPost(post.slug)}
@@ -112,6 +80,26 @@ export function BlogIndex({ posts, onOpenPost }) {
           ))}
         </div>
       )}
+
+      {publishedPosts.length > visiblePosts.length ? (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+          <button
+            onClick={() => setVisibleCount((current) => current + BLOG_PAGE_SIZE)}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 999,
+              border: `1px solid ${THEME.panelBorder}`,
+              background: THEME.panelBackgroundStrong,
+              color: THEME.textPrimary,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Load more posts
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -145,7 +133,13 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleCount, setVisibleCount] = useState(FORUM_PAGE_SIZE);
+  const [submitCount, setSubmitCount] = useState(0);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
+  const errors = useMemo(
+    () => validateForumThreadDraft({ title, body }, { requiresCaptcha, captchaToken }),
+    [title, body, requiresCaptcha, captchaToken],
+  );
 
   const visibleThreads = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -160,7 +154,17 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
     });
   }, [threads, searchQuery, isAdmin]);
 
+  useEffect(() => {
+    setVisibleCount(FORUM_PAGE_SIZE);
+  }, [searchQuery, threads.length]);
+
   const handleCreate = async () => {
+    setSubmitCount((current) => current + 1);
+
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
     const created = await onCreateThread(
       { title, body },
       { honeypot, captchaToken },
@@ -172,8 +176,11 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
       setHoneypot("");
       setCaptchaToken("");
       setCaptchaResetKey((value) => value + 1);
+      setSubmitCount(0);
     }
   };
+
+  const pagedThreads = visibleThreads.slice(0, visibleCount);
 
   return (
     <div>
@@ -186,16 +193,61 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
       <div style={{ ...panelStyle, marginBottom: 18 }}>
         <div style={{ fontSize: 16, color: THEME.textPrimary, fontWeight: 700, marginBottom: 10 }}>Start a new discussion</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Thread title" style={inputStyle} />
-          <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="What do you want to ask or discuss?" rows={5} style={{ ...inputStyle, resize: "vertical" }} />
+          {submitCount > 0 && Object.keys(errors).length > 0 ? (
+            <div
+              role="alert"
+              style={{
+                border: "1px solid rgba(220,38,38,0.18)",
+                background: "rgba(254,242,242,0.9)",
+                color: "#b91c1c",
+                padding: "12px 14px",
+                borderRadius: 12,
+                fontSize: 13,
+              }}
+            >
+              Fix the highlighted fields before creating the thread.
+            </div>
+          ) : null}
+          <FormField label="Thread title" required error={submitCount > 0 ? errors.title : ""}>
+            {({ fieldId, errorId }) => (
+              <input
+                id={fieldId}
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                placeholder="Thread title"
+                aria-invalid={submitCount > 0 && Boolean(errors.title)}
+                aria-describedby={errorId}
+                style={getInputStateStyle(submitCount > 0 && Boolean(errors.title))}
+              />
+            )}
+          </FormField>
+          <FormField label="Question or discussion" required error={submitCount > 0 ? errors.body : ""}>
+            {({ fieldId, errorId }) => (
+              <textarea
+                id={fieldId}
+                value={body}
+                onChange={(event) => setBody(event.target.value)}
+                placeholder="What do you want to ask or discuss?"
+                rows={5}
+                aria-invalid={submitCount > 0 && Boolean(errors.body)}
+                aria-describedby={errorId}
+                style={{ ...getInputStateStyle(submitCount > 0 && Boolean(errors.body)), resize: "vertical" }}
+              />
+            )}
+          </FormField>
           <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
           {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
+          {submitCount > 0 && errors.captchaToken ? (
+            <div role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+              {errors.captchaToken}
+            </div>
+          ) : null}
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
             <div style={{ fontSize: 12, color: THEME.textMuted }}>Forum posts are anonymous and can be queued for moderation if they look risky.</div>
             <button
               onClick={handleCreate}
-              disabled={!title.trim() || !body.trim() || (requiresCaptcha && !captchaToken)}
-              style={{ ...primaryButtonStyle, opacity: !title.trim() || !body.trim() || (requiresCaptcha && !captchaToken) ? 0.6 : 1 }}
+              disabled={Object.keys(errors).length > 0}
+              style={{ ...primaryButtonStyle, opacity: Object.keys(errors).length > 0 ? 0.6 : 1 }}
             >
               Create Thread
             </button>
@@ -204,7 +256,13 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
       </div>
 
       <div style={{ marginBottom: 16 }}>
-        <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search discussions..." style={inputStyle} />
+        <input
+          value={searchQuery}
+          onChange={(event) => setSearchQuery(event.target.value)}
+          placeholder="Search discussions..."
+          aria-label="Search forum discussions"
+          style={inputStyle}
+        />
       </div>
 
       {visibleThreads.length === 0 ? (
@@ -215,7 +273,7 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {visibleThreads.map((thread) => (
+          {pagedThreads.map((thread) => (
             <button
               key={thread.id}
               onClick={() => onOpenThread(thread.slug)}
@@ -239,6 +297,26 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
           ))}
         </div>
       )}
+
+      {visibleThreads.length > pagedThreads.length ? (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 18 }}>
+          <button
+            onClick={() => setVisibleCount((current) => current + FORUM_PAGE_SIZE)}
+            style={{
+              padding: "10px 18px",
+              borderRadius: 999,
+              border: `1px solid ${THEME.panelBorder}`,
+              background: THEME.panelBackgroundStrong,
+              color: THEME.textPrimary,
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            Load more discussions
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -250,8 +328,19 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const visibleReplies = isAdmin ? thread.replies : thread.replies.filter((reply) => reply.reviewState === "approved");
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
+  const [submitCount, setSubmitCount] = useState(0);
+  const errors = useMemo(
+    () => validateForumReplyDraft(replyText, { requiresCaptcha, captchaToken }),
+    [replyText, requiresCaptcha, captchaToken],
+  );
 
   const handleReply = async () => {
+    setSubmitCount((current) => current + 1);
+
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
     const created = await onReplySubmit(
       thread.id,
       replyText,
@@ -263,6 +352,7 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
       setHoneypot("");
       setCaptchaToken("");
       setCaptchaResetKey((value) => value + 1);
+      setSubmitCount(0);
     }
   };
 
@@ -311,14 +401,47 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
           <div style={{ fontSize: 13, color: "#FBBF24" }}>This thread is locked. New replies are disabled.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <textarea value={replyText} onChange={(event) => setReplyText(event.target.value)} rows={4} placeholder="Share your experience or answer the question..." style={{ ...inputStyle, resize: "vertical" }} />
+            {submitCount > 0 && Object.keys(errors).length > 0 ? (
+              <div
+                role="alert"
+                style={{
+                  border: "1px solid rgba(220,38,38,0.18)",
+                  background: "rgba(254,242,242,0.9)",
+                  color: "#b91c1c",
+                  padding: "12px 14px",
+                  borderRadius: 12,
+                  fontSize: 13,
+                }}
+              >
+                Fix the highlighted fields before posting your reply.
+              </div>
+            ) : null}
+            <FormField label="Reply" required error={submitCount > 0 ? errors.reply : ""}>
+              {({ fieldId, errorId }) => (
+                <textarea
+                  id={fieldId}
+                  value={replyText}
+                  onChange={(event) => setReplyText(event.target.value)}
+                  rows={4}
+                  placeholder="Share your experience or answer the question..."
+                  aria-invalid={submitCount > 0 && Boolean(errors.reply)}
+                  aria-describedby={errorId}
+                  style={{ ...getInputStateStyle(submitCount > 0 && Boolean(errors.reply)), resize: "vertical" }}
+                />
+              )}
+            </FormField>
             <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
             {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
+            {submitCount > 0 && errors.captchaToken ? (
+              <div role="alert" style={{ color: "#b91c1c", fontSize: 12 }}>
+                {errors.captchaToken}
+              </div>
+            ) : null}
             <div style={{ display: "flex", justifyContent: "flex-end" }}>
               <button
                 onClick={handleReply}
-                disabled={!replyText.trim() || (requiresCaptcha && !captchaToken)}
-                style={{ ...primaryButtonStyle, opacity: !replyText.trim() || (requiresCaptcha && !captchaToken) ? 0.6 : 1 }}
+                disabled={Object.keys(errors).length > 0}
+                style={{ ...primaryButtonStyle, opacity: Object.keys(errors).length > 0 ? 0.6 : 1 }}
               >
                 Post Reply
               </button>

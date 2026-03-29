@@ -80,10 +80,10 @@ In Supabase mode, moderation routes through the authenticated `admin-actions` Ed
 
 ### Supabase Setup
 1. Create a Supabase project.
-2. Run the SQL in [supabase/schema.sql](/Users/abdulbaari/Scholartrack/supabase/schema.sql) in the Supabase SQL editor.
-3. Leave [supabase/seed.sql](/Users/abdulbaari/Scholartrack/supabase/seed.sql) untouched for production. Shared environments should start with a clean report feed.
-4. Deploy the moderation Edge Function from [supabase/functions/admin-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/admin-actions/index.ts).
-5. Deploy the public posting Edge Function from [supabase/functions/public-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/public-actions/index.ts).
+2. Run the SQL in [supabase/schema.sql](./supabase/schema.sql) in the Supabase SQL editor.
+3. Leave [supabase/seed.sql](./supabase/seed.sql) untouched for production. Shared environments should start with a clean report feed.
+4. Deploy the moderation Edge Function from [supabase/functions/admin-actions/index.ts](./supabase/functions/admin-actions/index.ts).
+5. Deploy the public posting Edge Function from [supabase/functions/public-actions/index.ts](./supabase/functions/public-actions/index.ts).
 6. Create `.env.local` from `.env.example` and fill in:
 
 ```bash

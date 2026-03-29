@@ -4,6 +4,7 @@ import { LEVELS, STATUSES, STATUS_CONFIG } from "./lib/constants";
 import { appDataStore, DATA_BACKEND_MODE } from "./lib/appDataStore";
 import { hasStoredHumanTrust } from "./lib/humanVerification";
 import { parseAppRoute, pushAppRoute } from "./lib/router";
+import { THEME, inputStyle, panelStyle, panelTitle, primaryButtonStyle } from "./lib/theme";
 import { loadTurnstileScript } from "./lib/turnstile";
 import { turnstileSiteKey } from "./lib/supabaseClient";
 import {
@@ -761,7 +762,7 @@ export default function AwaitedApp() {
   const trustPage = TRUST_PAGES[resolvedView] || null;
 
   return (
-    <div style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", minHeight: "100vh", background: "linear-gradient(180deg, #0F172A 0%, #1E293B 100%)", color: "#E2E8F0" }}>
+    <div style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", minHeight: "100vh", background: THEME.pageBackground, color: THEME.textPrimary }}>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet" />
 
       {flashMessage && (
@@ -770,12 +771,12 @@ export default function AwaitedApp() {
         </div>
       )}
 
-      <header style={{ padding: "20px 28px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
+      <header style={{ padding: "20px 28px", borderBottom: `1px solid ${THEME.panelBorderSoft}`, background: "rgba(248,250,252,0.7)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12, backdropFilter: "blur(12px)" }}>
         <div style={{ display: "flex", alignItems: "baseline", gap: 10, cursor: "pointer" }} onClick={() => applyRoute("feed")}>
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 26, fontWeight: 800, background: "linear-gradient(135deg, #38BDF8, #818CF8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Awaited</span>
           <span
             onClick={handleBetaTap}
-            style={{ fontSize: 11, color: "#64748B", fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}
+            style={{ fontSize: 11, color: THEME.textMuted, fontWeight: 500, letterSpacing: 1.5, textTransform: "uppercase" }}
           >
             Beta
           </span>
@@ -788,50 +789,50 @@ export default function AwaitedApp() {
           {isAdmin ? (
             <>
               <NavBtn active={resolvedView === "admin"} onClick={() => applyRoute("admin")} admin>⚙ Admin</NavBtn>
-              <button onClick={handleAdminLogout} style={{ background: "none", border: "none", color: "#64748B", fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Logout</button>
+              <button onClick={handleAdminLogout} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 11, cursor: "pointer", padding: "4px 8px" }}>Logout</button>
             </>
           ) : canAccessAdminEntry ? (
-            <button onClick={() => applyRoute("login")} style={{ background: "none", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 8, color: "#475569", fontSize: 11, cursor: "pointer", padding: "6px 12px" }}>Admin</button>
+            <button onClick={() => applyRoute("login")} style={{ background: THEME.panelBackgroundStrong, border: `1px solid ${THEME.panelBorder}`, borderRadius: 8, color: THEME.textSoft, fontSize: 11, cursor: "pointer", padding: "6px 12px" }}>Admin</button>
           ) : null}
         </div>
       </header>
 
       {isAdmin && resolvedView !== "admin" && (
-        <div style={{ background: "rgba(99,102,241,0.1)", borderBottom: "1px solid rgba(99,102,241,0.2)", padding: "8px 28px", fontSize: 12, color: "#A5B4FC", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ background: THEME.accentSurface, borderBottom: `1px solid ${THEME.accentBorder}`, padding: "8px 28px", fontSize: 12, color: THEME.accentText, display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366F1" }} />
           Admin session active as {adminUser?.email}. Pending and hidden content is visible in review mode.
         </div>
       )}
 
       {activeDataMode === "supabase" && (
-        <div style={{ background: "rgba(5,150,105,0.08)", borderBottom: "1px solid rgba(5,150,105,0.18)", padding: "8px 28px", fontSize: 12, color: "#6EE7B7", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ background: "rgba(5,150,105,0.08)", borderBottom: "1px solid rgba(5,150,105,0.18)", padding: "8px 28px", fontSize: 12, color: "#047857", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#10B981" }} />
           Shared backend active — submissions, moderation, and live updates sync across users through Supabase.
         </div>
       )}
 
       {activeDataMode === "browser-local" && DATA_BACKEND_MODE === "supabase" && (
-        <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#FBBF24", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#b45309", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F59E0B" }} />
           Supabase is configured, but this session is currently using browser-local fallback because the backend could not be reached.
         </div>
       )}
 
       {activeDataMode === "browser-local" && DATA_BACKEND_MODE === "browser-local" && (
-        <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#FBBF24", display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#b45309", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F59E0B" }} />
           Browser-local fallback active — local testing only. Secure auth, moderation queue, and shared routing need Supabase mode.
         </div>
       )}
 
       {isHydrating && (
-        <div style={{ background: "rgba(56,189,248,0.08)", borderBottom: "1px solid rgba(56,189,248,0.16)", padding: "8px 28px", fontSize: 12, color: "#7DD3FC" }}>
+        <div style={{ background: "rgba(56,189,248,0.08)", borderBottom: "1px solid rgba(56,189,248,0.16)", padding: "8px 28px", fontSize: 12, color: "#0369a1" }}>
           Loading shared scholarship data…
         </div>
       )}
 
       {syncError && (
-        <div style={{ background: "rgba(220,38,38,0.08)", borderBottom: "1px solid rgba(220,38,38,0.16)", padding: "8px 28px", fontSize: 12, color: "#FCA5A5" }}>
+        <div style={{ background: "rgba(220,38,38,0.08)", borderBottom: "1px solid rgba(220,38,38,0.16)", padding: "8px 28px", fontSize: 12, color: "#b91c1c" }}>
           {syncError}
         </div>
       )}
@@ -839,10 +840,10 @@ export default function AwaitedApp() {
       <main style={{ maxWidth: 960, margin: "0 auto", padding: "24px 20px 64px" }}>
         {(resolvedView === "login") && (
           <div style={{ maxWidth: 420, margin: "60px auto" }}>
-            <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 32, textAlign: "center" }}>
+            <div style={{ ...panelStyle, borderRadius: 16, padding: 32, textAlign: "center" }}>
               <div style={{ fontSize: 32, marginBottom: 12 }}>🔐</div>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Admin Sign In</h2>
-              <p style={{ color: "#64748B", fontSize: 13, marginBottom: 24 }}>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 22, fontWeight: 700, marginBottom: 6, color: THEME.textPrimary }}>Admin Sign In</h2>
+              <p style={{ color: THEME.textMuted, fontSize: 13, marginBottom: 24 }}>
                 Use the Awaited admin account. Production now requires a real Supabase user session, not a shared browser password.
               </p>
               <input
@@ -868,7 +869,7 @@ export default function AwaitedApp() {
               />
               {adminAuthError && <div style={{ color: "#FCA5A5", fontSize: 12, marginBottom: 12 }}>{adminAuthError}</div>}
               <button onClick={handleAdminLogin} style={{ width: "100%", padding: "12px", borderRadius: 10, border: "none", background: "linear-gradient(135deg, #6366F1, #818CF8)", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Enter Admin</button>
-              <button onClick={() => applyRoute("feed")} style={{ background: "none", border: "none", color: "#475569", fontSize: 12, cursor: "pointer", marginTop: 12 }}>Cancel</button>
+              <button onClick={() => applyRoute("feed")} style={{ background: "none", border: "none", color: THEME.textSoft, fontSize: 12, cursor: "pointer", marginTop: 12 }}>Cancel</button>
             </div>
           </div>
         )}
@@ -876,11 +877,11 @@ export default function AwaitedApp() {
         {resolvedView === "admin" && isAdmin && (
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 24 }}>
-              <button onClick={() => applyRoute("feed")} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", padding: 0 }}>← Back</button>
-              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Admin Panel</h2>
+              <button onClick={() => applyRoute("feed")} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}>← Back</button>
+              <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, margin: 0, color: THEME.textPrimary }}>Admin Panel</h2>
             </div>
 
-            <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 4, border: "1px solid rgba(255,255,255,0.06)", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 4, marginBottom: 24, background: THEME.panelBackgroundSubtle, borderRadius: 12, padding: 4, border: `1px solid ${THEME.panelBorder}`, flexWrap: "wrap" }}>
               {[["moderation", "🛡 Moderation"], ["analytics", "📊 Analytics"], ["scholarships", "🎓 Scholarships"], ["blog", "📝 Blog"]].map(([key, label]) => (
                 <button
                   key={key}
@@ -893,8 +894,8 @@ export default function AwaitedApp() {
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: "pointer",
-                    background: adminTab === key ? "rgba(99,102,241,0.15)" : "transparent",
-                    color: adminTab === key ? "#A5B4FC" : "#64748B",
+                    background: adminTab === key ? THEME.accentSurface : "transparent",
+                    color: adminTab === key ? THEME.accentText : THEME.textMuted,
                   }}
                 >
                   {label}
@@ -916,7 +917,7 @@ export default function AwaitedApp() {
                 {pendingResults.length > 0 && (
                   <div style={panelStyle}>
                     <h3 style={panelTitle}>Queue: Pending Results</h3>
-                    <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
+                    <p style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 12 }}>
                       New reports can be auto-queued when they use an unknown scholarship name, trip throttles, or look suspicious.
                     </p>
                     {pendingResults.map((result) => (
@@ -940,9 +941,9 @@ export default function AwaitedApp() {
                       <div key={`pending-comment-${comment.id}`} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)", marginBottom: 8 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#E2E8F0", marginBottom: 4 }}>{comment.scholarship}</div>
-                            <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>Commented on {comment.time}</div>
-                            <div style={{ fontSize: 13, color: "#CBD5E1", marginBottom: 6 }}>{comment.text}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.textPrimary, marginBottom: 4 }}>{comment.scholarship}</div>
+                            <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>Commented on {comment.time}</div>
+                            <div style={{ fontSize: 13, color: THEME.textSecondary, marginBottom: 6 }}>{comment.text}</div>
                             {comment.moderationReason && <ModerationChip reviewState="pending" reason={comment.moderationReason} />}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -963,9 +964,9 @@ export default function AwaitedApp() {
                       <div key={`pending-thread-${thread.id}`} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)", marginBottom: 8 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0", marginBottom: 4 }}>{thread.title}</div>
-                            <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{new Date(thread.createdAt).toLocaleString()}</div>
-                            <div style={{ fontSize: 13, color: "#CBD5E1", marginBottom: 6, whiteSpace: "pre-wrap" }}>{thread.body}</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary, marginBottom: 4 }}>{thread.title}</div>
+                            <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>{new Date(thread.createdAt).toLocaleString()}</div>
+                            <div style={{ fontSize: 13, color: THEME.textSecondary, marginBottom: 6, whiteSpace: "pre-wrap" }}>{thread.body}</div>
                             {thread.moderationReason && <ModerationChip reviewState="pending" reason={thread.moderationReason} />}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -986,9 +987,9 @@ export default function AwaitedApp() {
                       <div key={`pending-forum-reply-${reply.id}`} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)", marginBottom: 8 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#E2E8F0", marginBottom: 4 }}>{reply.threadTitle}</div>
-                            <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{new Date(reply.createdAt).toLocaleString()}</div>
-                            <div style={{ fontSize: 13, color: "#CBD5E1", marginBottom: 6, whiteSpace: "pre-wrap" }}>{reply.body}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: THEME.textPrimary, marginBottom: 4 }}>{reply.threadTitle}</div>
+                            <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>{new Date(reply.createdAt).toLocaleString()}</div>
+                            <div style={{ fontSize: 13, color: THEME.textSecondary, marginBottom: 6, whiteSpace: "pre-wrap" }}>{reply.body}</div>
                             {reply.moderationReason && <ModerationChip reviewState="pending" reason={reply.moderationReason} />}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1004,7 +1005,7 @@ export default function AwaitedApp() {
 
                 <div style={panelStyle}>
                   <h3 style={panelTitle}>All Submitted Results</h3>
-                  <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, color: THEME.textMuted, marginBottom: 16 }}>
                     {results.length} total results across approved, pending, rejected, and hidden states
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1012,8 +1013,8 @@ export default function AwaitedApp() {
                       <div
                         key={result.id}
                         style={{
-                          background: result.hidden ? "rgba(220,38,38,0.05)" : "rgba(255,255,255,0.03)",
-                          border: `1px solid ${result.hidden ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)"}`,
+                          background: result.hidden ? "rgba(220,38,38,0.05)" : THEME.panelBackgroundStrong,
+                          border: `1px solid ${result.hidden ? "rgba(220,38,38,0.15)" : THEME.panelBorderSoft}`,
                           borderRadius: 12,
                           padding: "14px 18px",
                           opacity: result.hidden ? 0.65 : 1,
@@ -1027,8 +1028,8 @@ export default function AwaitedApp() {
                               <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
                               {!isVerifiedScholarship(result.scholarship) && <span style={{ fontSize: 10, color: "#D97706", fontWeight: 500 }}>⚠ Unverified name</span>}
                             </div>
-                            <div style={{ fontSize: 12, color: "#64748B" }}>{result.country} · {result.level} · {result.field} {result.nationality ? `· ${result.nationality}` : ""} · {result.date}</div>
-                            {result.note && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{result.note}</div>}
+                            <div style={{ fontSize: 12, color: THEME.textMuted }}>{result.country} · {result.level} · {result.field} {result.nationality ? `· ${result.nationality}` : ""} · {result.date}</div>
+                            {result.note && <div style={{ fontSize: 12, color: THEME.textSecondary, marginTop: 6, lineHeight: 1.5 }}>{result.note}</div>}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                             {result.reviewState !== "approved" && (
@@ -1059,7 +1060,7 @@ export default function AwaitedApp() {
 
                 <div style={panelStyle}>
                   <h3 style={panelTitle}>Status Distribution</h3>
-                  <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 12, background: "rgba(255,255,255,0.05)" }}>
+                  <div style={{ display: "flex", height: 12, borderRadius: 6, overflow: "hidden", marginBottom: 12, background: THEME.panelBackgroundMuted }}>
                     {STATUSES.map((status) => analytics.byStatus[status] > 0 ? (
                       <div key={status} style={{ width: `${(analytics.byStatus[status] / Math.max(analytics.totalVisible, 1)) * 100}%`, background: STATUS_CONFIG[status].color }} />
                     ) : null)}
@@ -1068,8 +1069,8 @@ export default function AwaitedApp() {
                     {STATUSES.map((status) => (
                       <div key={status} style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 5 }}>
                         <span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_CONFIG[status].color }} />
-                        <span style={{ color: "#94A3B8" }}>{status}</span>
-                        <span style={{ color: "#E2E8F0", fontWeight: 700 }}>{analytics.byStatus[status]}</span>
+                        <span style={{ color: THEME.textSecondary }}>{status}</span>
+                        <span style={{ color: THEME.textPrimary, fontWeight: 700 }}>{analytics.byStatus[status]}</span>
                       </div>
                     ))}
                   </div>
@@ -1082,10 +1083,10 @@ export default function AwaitedApp() {
                     return (
                       <div key={name} style={{ marginBottom: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                          <span style={{ color: "#E2E8F0", fontWeight: 500 }}>{name}</span>
-                          <span style={{ color: "#64748B" }}>{count}</span>
+                          <span style={{ color: THEME.textPrimary, fontWeight: 500 }}>{name}</span>
+                          <span style={{ color: THEME.textMuted }}>{count}</span>
                         </div>
-                        <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
+                        <div style={{ height: 6, borderRadius: 3, background: THEME.panelBackgroundMuted, overflow: "hidden" }}>
                           <div style={{ height: "100%", width: `${(count / maxCount) * 100}%`, background: "linear-gradient(90deg, #6366F1, #818CF8)", borderRadius: 3 }} />
                         </div>
                       </div>
@@ -1099,12 +1100,12 @@ export default function AwaitedApp() {
               <div>
                 <div style={{ ...panelStyle, marginBottom: 16 }}>
                   <h3 style={panelTitle}>Scholarship Catalog</h3>
-                  <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>
+                  <p style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 16 }}>
                     Database-backed scholarships are seeded into the backend and stay canonical. Community-added names remain possible, but they can now be verified manually or left queued in moderation.
                   </p>
                   <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                     <input type="text" value={newVerified} onChange={(event) => setNewVerified(event.target.value)} onKeyDown={(event) => event.key === "Enter" && addManualVerifiedScholarship(newVerified)} placeholder="Manually verify a community-added scholarship..." style={{ ...inputStyle, flex: 1 }} />
-                    <button onClick={() => addManualVerifiedScholarship(newVerified)} disabled={!newVerified.trim()} style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: newVerified.trim() ? "linear-gradient(135deg, #6366F1, #818CF8)" : "rgba(255,255,255,0.05)", color: newVerified.trim() ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: newVerified.trim() ? "pointer" : "default" }}>Add</button>
+                    <button onClick={() => addManualVerifiedScholarship(newVerified)} disabled={!newVerified.trim()} style={{ padding: "10px 20px", borderRadius: 10, border: "none", background: newVerified.trim() ? "linear-gradient(135deg, #6366F1, #818CF8)" : THEME.panelBackgroundMuted, color: newVerified.trim() ? "#fff" : THEME.textSoft, fontSize: 13, fontWeight: 600, cursor: newVerified.trim() ? "pointer" : "default" }}>Add</button>
                   </div>
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
                     <span style={{ fontSize: 12, color: "#38BDF8" }}>{DATABASE_SCHOLARSHIP_NAMES.length} database scholarships</span>
@@ -1116,14 +1117,14 @@ export default function AwaitedApp() {
                       const count = approvedVisibleResults.filter((result) => result.scholarship === name).length;
                       const databaseBacked = isDatabaseScholarship(name);
                       return (
-                        <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+                        <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderRadius: 8, background: THEME.panelBackgroundStrong, border: `1px solid ${THEME.panelBorderSoft}` }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ color: "#059669", fontSize: 12 }}>✓</span>
-                            <span style={{ fontSize: 13, color: "#E2E8F0" }}>{name}</span>
+                            <span style={{ fontSize: 13, color: THEME.textPrimary }}>{name}</span>
                             <span style={{ fontSize: 10, color: databaseBacked ? "#38BDF8" : "#A78BFA", textTransform: "uppercase", letterSpacing: 0.8 }}>
                               {databaseBacked ? "Database" : "Manual"}
                             </span>
-                            <span style={{ fontSize: 11, color: "#475569" }}>({count} reports)</span>
+                            <span style={{ fontSize: 11, color: THEME.textSoft }}>({count} reports)</span>
                           </div>
                           {!databaseBacked && (
                             <button onClick={() => applyStoreMutation(() => appDataStore.removeVerifiedScholarship(name))} style={{ background: "none", border: "none", color: "#DC2626", fontSize: 11, cursor: "pointer", opacity: 0.5, padding: "4px 8px" }}>Remove</button>
@@ -1159,7 +1160,7 @@ export default function AwaitedApp() {
             </div>
 
             <div style={{ display: "flex", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
-              <input type="text" placeholder="Search scholarships, countries, fields..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} style={{ flex: 1, minWidth: 220, padding: "10px 16px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.05)", color: "#E2E8F0", fontSize: 14, outline: "none" }} />
+              <input type="text" placeholder="Search scholarships, countries, fields..." value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} style={{ ...inputStyle, flex: 1, minWidth: 220, padding: "10px 16px" }} />
               <FilterSelect value={filterLevel} onChange={(event) => setFilterLevel(event.target.value)} options={["All", ...LEVELS]} label="Level" />
               <FilterSelect value={filterCountry} onChange={(event) => setFilterCountry(event.target.value)} options={["All", ...countries]} label="Country" />
             </div>
@@ -1172,7 +1173,7 @@ export default function AwaitedApp() {
                 }
 
                 return (
-                  <button key={name} onClick={() => applyRoute("scholarship", { scholarshipName: name })} style={{ padding: "6px 14px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#94A3B8", fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+                  <button key={name} onClick={() => applyRoute("scholarship", { scholarshipName: name })} style={{ padding: "6px 14px", borderRadius: 20, border: `1px solid ${THEME.panelBorder}`, background: THEME.panelBackgroundStrong, color: THEME.textSecondary, fontSize: 12, fontWeight: 500, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
                     {isVerifiedScholarship(name) && <span style={{ color: "#059669", fontSize: 10 }}>✓</span>}
                     {name} ({count})
                   </button>
@@ -1184,7 +1185,7 @@ export default function AwaitedApp() {
               visibleResults.length === 0 ? (
                 <EmptyFeedState onSubmit={() => applyRoute("submit")} />
               ) : (
-                <div style={{ textAlign: "center", padding: 60, color: "#475569" }}>
+                <div style={{ textAlign: "center", padding: 60, color: THEME.textSoft }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>∅</div>
                   <div style={{ fontSize: 15 }}>No results match your filters</div>
                 </div>
@@ -1211,7 +1212,7 @@ export default function AwaitedApp() {
                 ))}
               </div>
             )}
-            <div style={{ textAlign: "center", marginTop: 32, color: "#475569", fontSize: 13 }}>Showing {filtered.length} of {visibleResults.length} results</div>
+            <div style={{ textAlign: "center", marginTop: 32, color: THEME.textSoft, fontSize: 13 }}>Showing {filtered.length} of {visibleResults.length} results</div>
           </>
         )}
 
@@ -1232,7 +1233,7 @@ export default function AwaitedApp() {
         {resolvedView === "blogPost" && !selectedBlogPost && (
           <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
             <h3 style={{ ...panelTitle, marginBottom: 8 }}>Blog Post Not Found</h3>
-            <p style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>
+            <p style={{ color: THEME.textMuted, fontSize: 13, marginBottom: 12 }}>
               That post either does not exist or is not published for the public site.
             </p>
             <button onClick={() => applyRoute("blog")} style={{ ...primaryButtonStyle, width: "auto", padding: "10px 18px" }}>Back to blog</button>
@@ -1260,7 +1261,7 @@ export default function AwaitedApp() {
         {resolvedView === "forumThread" && !selectedForumThread && (
           <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
             <h3 style={{ ...panelTitle, marginBottom: 8 }}>Discussion Not Found</h3>
-            <p style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>
+            <p style={{ color: THEME.textMuted, fontSize: 13, marginBottom: 12 }}>
               That thread either does not exist or is still waiting for moderation.
             </p>
             <button onClick={() => applyRoute("forum")} style={{ ...primaryButtonStyle, width: "auto", padding: "10px 18px" }}>Back to forum</button>
@@ -1308,7 +1309,7 @@ export default function AwaitedApp() {
         {resolvedView === "scholarship" && !selectedScholarship && (
           <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
             <h3 style={{ ...panelTitle, marginBottom: 8 }}>Scholarship Not Found</h3>
-            <p style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>
+            <p style={{ color: THEME.textMuted, fontSize: 13, marginBottom: 12 }}>
               The link is valid only if Awaited has seen reports or a verified record for that scholarship name.
             </p>
             <button onClick={() => applyRoute("feed")} style={{ ...primaryButtonStyle, width: "auto", padding: "10px 18px" }}>Back to feed</button>
@@ -1320,10 +1321,10 @@ export default function AwaitedApp() {
 
       <style>{`
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-        input::placeholder, textarea::placeholder { color: #475569; }
+        input::placeholder, textarea::placeholder { color: ${THEME.textSoft}; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: rgba(100,116,139,0.28); border-radius: 3px; }
       `}</style>
     </div>
   );
@@ -1336,20 +1337,21 @@ function NavBtn({ children, active, accent, admin, onClick }) {
       style={{
         padding: "8px 14px",
         borderRadius: 10,
-        border: active ? "1px solid rgba(129,140,248,0.3)" : "1px solid rgba(255,255,255,0.06)",
+        border: active ? "1px solid rgba(129,140,248,0.3)" : `1px solid ${THEME.panelBorder}`,
         background: active
           ? accent
             ? "linear-gradient(135deg, #6366F1, #818CF8)"
             : admin
-              ? "rgba(99,102,241,0.16)"
-              : "rgba(255,255,255,0.06)"
+              ? THEME.accentSurface
+              : THEME.panelBackgroundStrong
           : accent
             ? "linear-gradient(135deg, #6366F1, #818CF8)"
-            : "rgba(255,255,255,0.03)",
-        color: accent || active ? "#fff" : "#CBD5E1",
+            : THEME.panelBackgroundStrong,
+        color: accent || active ? "#fff" : THEME.textSecondary,
         fontSize: 13,
         fontWeight: 600,
         cursor: "pointer",
+        boxShadow: accent || active ? "0 10px 22px rgba(79,70,229,0.16)" : "none",
       }}
     >
       {children}
@@ -1367,14 +1369,15 @@ function StatChip({ label, value, color, onClick, active }) {
         gap: 8,
         padding: "10px 14px",
         borderRadius: 12,
-        border: active ? `1px solid ${color}` : "1px solid rgba(255,255,255,0.06)",
-        background: active ? `${color}18` : "rgba(255,255,255,0.03)",
-        color: "#E2E8F0",
+        border: active ? `1px solid ${color}` : `1px solid ${THEME.panelBorder}`,
+        background: active ? `${color}18` : THEME.panelBackgroundStrong,
+        color: THEME.textPrimary,
         cursor: onClick ? "pointer" : "default",
+        boxShadow: THEME.panelShadow,
       }}
     >
       <span style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />
-      <span style={{ fontSize: 12, color: "#94A3B8" }}>{label}</span>
+      <span style={{ fontSize: 12, color: THEME.textSecondary }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 700 }}>{value}</span>
     </button>
   );
@@ -1387,19 +1390,19 @@ function TrustNotice({ onNavigate, compact = false }) {
         ...panelStyle,
         marginBottom: compact ? 20 : 24,
         padding: compact ? "16px 18px" : "18px 20px",
-        background: "rgba(56,189,248,0.06)",
+        background: "rgba(56,189,248,0.1)",
         border: "1px solid rgba(56,189,248,0.14)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 240 }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: "#7DD3FC", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#0369a1", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
             Trust Notice
           </div>
-          <div style={{ fontSize: compact ? 14 : 15, fontWeight: 700, color: "#E2E8F0", marginBottom: 6 }}>
+          <div style={{ fontSize: compact ? 14 : 15, fontWeight: 700, color: THEME.textPrimary, marginBottom: 6 }}>
             Awaited shows user-submitted scholarship signals, not official scholarship decisions.
           </div>
-          <div style={{ fontSize: 13, lineHeight: 1.6, color: "#94A3B8" }}>
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: THEME.textSecondary }}>
             Treat every report as community intelligence. Verify final decisions through the official scholarship portal, email, or provider website, and never post personal identifiers.
           </div>
         </div>
@@ -1418,7 +1421,7 @@ function EmptyFeedState({ onSubmit }) {
     <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
       <div style={{ fontSize: 40, marginBottom: 10 }}>⌛</div>
       <h3 style={{ ...panelTitle, marginBottom: 8 }}>No public scholarship reports yet</h3>
-      <p style={{ color: "#94A3B8", fontSize: 14, lineHeight: 1.6, maxWidth: 560, margin: "0 auto 18px" }}>
+      <p style={{ color: THEME.textSecondary, fontSize: 14, lineHeight: 1.6, maxWidth: 560, margin: "0 auto 18px" }}>
         Awaited is now running with a clean live dataset. The next public report will come from a real community submission, not seeded beta content.
       </p>
       <button onClick={onSubmit} style={{ ...primaryButtonStyle, width: "auto", padding: "12px 22px" }}>
@@ -1457,7 +1460,7 @@ function FilterSelect({ value, onChange, options, label }) {
   return (
     <select value={value} onChange={onChange} aria-label={label} style={{ ...inputStyle, width: "auto", minWidth: 140 }}>
       {options.map((option) => (
-        <option key={option} value={option} style={{ background: "#1E293B" }}>{option}</option>
+        <option key={option} value={option} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{option}</option>
       ))}
     </select>
   );
@@ -1485,8 +1488,8 @@ function AdminBtn({ children, color, onClick, small }) {
 
 function AnalyticsCard({ label, value, color }) {
   return (
-    <div style={{ padding: "16px 18px", borderRadius: 14, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
-      <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{label}</div>
+    <div style={{ padding: "16px 18px", borderRadius: 14, background: THEME.panelBackgroundStrong, border: `1px solid ${THEME.panelBorder}`, boxShadow: THEME.panelShadow }}>
+      <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 28, fontWeight: 800, color }}>{value}</div>
     </div>
   );
@@ -1498,13 +1501,13 @@ function ModerationResultRow({ result, verified, onApprove, onReject, onDelete, 
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div style={{ flex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-            <span style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0" }}>{result.scholarship}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: THEME.textPrimary }}>{result.scholarship}</span>
             <StatusBadge status={result.status} />
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {!verified && <span style={{ fontSize: 10, color: "#D97706" }}>Unknown scholarship</span>}
           </div>
-          <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{result.country} · {result.level} · {result.field} · {result.date}</div>
-          {result.note && <div style={{ fontSize: 13, color: "#CBD5E1", marginBottom: 6 }}>{result.note}</div>}
+          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>{result.country} · {result.level} · {result.field} · {result.date}</div>
+          {result.note && <div style={{ fontSize: 13, color: THEME.textSecondary, marginBottom: 6 }}>{result.note}</div>}
           {result.moderationReason && <div style={{ fontSize: 12, color: "#FBBF24" }}>Reason: {result.moderationReason}</div>}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -1554,17 +1557,17 @@ function ResultCard({
   const visibleComments = isAdmin ? result.comments : result.comments.filter((comment) => comment.reviewState === "approved");
 
   return (
-    <div style={{ background: result.hidden ? "rgba(220,38,38,0.03)" : "rgba(255,255,255,0.03)", border: `1px solid ${result.hidden ? "rgba(220,38,38,0.1)" : "rgba(255,255,255,0.06)"}`, borderRadius: 14, overflow: "hidden", opacity: result.hidden ? 0.55 : 1 }}>
+    <div style={{ background: result.hidden ? "rgba(220,38,38,0.03)" : THEME.panelBackgroundStrong, border: `1px solid ${result.hidden ? "rgba(220,38,38,0.1)" : THEME.panelBorder}`, borderRadius: 14, overflow: "hidden", opacity: result.hidden ? 0.55 : 1, boxShadow: THEME.panelShadow }}>
       <div style={{ padding: "16px 20px", display: "flex", alignItems: "flex-start", gap: 16, cursor: "pointer" }} onClick={onToggle}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
             {verified && <span style={{ color: "#059669", fontSize: 11 }} title="Verified scholarship">✓</span>}
-            <span onClick={(event) => { event.stopPropagation(); onScholarshipClick(result.scholarship); }} style={{ fontSize: 15, fontWeight: 600, color: "#E2E8F0", cursor: "pointer", borderBottom: "1px dashed rgba(255,255,255,0.2)", textDecoration: result.hidden ? "line-through" : "none" }}>{result.scholarship}</span>
+            <span onClick={(event) => { event.stopPropagation(); onScholarshipClick(result.scholarship); }} style={{ fontSize: 15, fontWeight: 600, color: THEME.textPrimary, cursor: "pointer", borderBottom: `1px dashed ${THEME.dashedBorder}`, textDecoration: result.hidden ? "line-through" : "none" }}>{result.scholarship}</span>
             <StatusBadge status={result.status} />
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {result.hidden && <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>HIDDEN</span>}
           </div>
-          <div style={{ display: "flex", gap: 16, fontSize: 12, color: "#64748B", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 16, fontSize: 12, color: THEME.textMuted, flexWrap: "wrap" }}>
             <span>📍 {result.country}</span>
             <span>🎓 {result.level}</span>
             <span>📚 {result.field}</span>
@@ -1573,22 +1576,22 @@ function ResultCard({
           </div>
         </div>
         <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 12, color: "#475569" }}>{result.date}</div>
-          {visibleComments.length > 0 && <div style={{ fontSize: 11, color: "#475569", marginTop: 4 }}>💬 {visibleComments.length}</div>}
+          <div style={{ fontSize: 12, color: THEME.textSoft }}>{result.date}</div>
+          {visibleComments.length > 0 && <div style={{ fontSize: 11, color: THEME.textSoft, marginTop: 4 }}>💬 {visibleComments.length}</div>}
         </div>
       </div>
 
       {expanded && (
-        <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", padding: "16px 20px" }}>
+        <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, padding: "16px 20px" }}>
           {result.note && (
-            <div style={{ fontSize: 13, color: "#94A3B8", lineHeight: 1.6, marginBottom: 16, padding: "12px 16px", background: "rgba(255,255,255,0.02)", borderRadius: 10, borderLeft: `3px solid ${STATUS_CONFIG[result.status].color}44` }}>
+            <div style={{ fontSize: 13, color: THEME.textSecondary, lineHeight: 1.6, marginBottom: 16, padding: "12px 16px", background: THEME.panelBackgroundSubtle, borderRadius: 10, borderLeft: `3px solid ${STATUS_CONFIG[result.status].color}44` }}>
               {result.note}
             </div>
           )}
 
           {isAdmin && (
-            <div style={{ display: "flex", gap: 6, marginBottom: 14, padding: "8px 12px", background: "rgba(99,102,241,0.06)", borderRadius: 8, border: "1px solid rgba(99,102,241,0.1)", flexWrap: "wrap" }}>
-              <span style={{ fontSize: 11, color: "#A5B4FC", marginRight: "auto", display: "flex", alignItems: "center" }}>⚙ Admin</span>
+            <div style={{ display: "flex", gap: 6, marginBottom: 14, padding: "8px 12px", background: THEME.accentSurface, borderRadius: 8, border: `1px solid ${THEME.accentBorder}`, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 11, color: THEME.accentText, marginRight: "auto", display: "flex", alignItems: "center" }}>⚙ Admin</span>
               {result.reviewState !== "approved" && <AdminBtn onClick={onApprove} color="#059669">Approve</AdminBtn>}
               {result.reviewState !== "rejected" && <AdminBtn onClick={onReject} color="#D97706">Reject</AdminBtn>}
               <AdminBtn onClick={onToggleHide} color={result.hidden ? "#059669" : "#D97706"}>{result.hidden ? "Unhide" : "Hide"}</AdminBtn>
@@ -1597,11 +1600,11 @@ function ResultCard({
           )}
 
           <div>
-            <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Discussion ({visibleComments.length})</div>
+            <div style={{ fontSize: 12, fontWeight: 600, color: THEME.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Discussion ({visibleComments.length})</div>
             {visibleComments.map((comment) => (
-              <div key={comment.id} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
+              <div key={comment.id} style={{ padding: "8px 12px", background: THEME.panelBackgroundSubtle, borderRadius: 8, marginBottom: 6, fontSize: 13, color: THEME.textSecondary, border: `1px solid ${THEME.panelBorderSoft}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                  <span style={{ color: "#64748B", fontSize: 11 }}>Anonymous · {comment.time}</span>
+                  <span style={{ color: THEME.textMuted, fontSize: 11 }}>Anonymous · {comment.time}</span>
                   {isAdmin && <ModerationChip reviewState={comment.reviewState} reason={comment.moderationReason} />}
                 </div>
                 <div style={{ marginTop: 4 }}>{comment.text}</div>
@@ -1670,10 +1673,10 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
 
   return (
     <div style={{ maxWidth: 600, margin: "0 auto" }}>
-      <button onClick={onCancel} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← Back to results</button>
-      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 32 }}>
-        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, marginBottom: 4, color: "#E2E8F0" }}>Submit Your Result</h2>
-        <p style={{ color: "#64748B", fontSize: 13, marginBottom: 28 }}>
+      <button onClick={onCancel} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← Back to results</button>
+      <div style={{ ...panelStyle, borderRadius: 16, padding: 32 }}>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, marginBottom: 4, color: THEME.textPrimary }}>Submit Your Result</h2>
+        <p style={{ color: THEME.textMuted, fontSize: 13, marginBottom: 28 }}>
           Anonymous results now go through throttling and moderation. Known scholarships can publish immediately; risky or unknown reports can land in the review queue first.
         </p>
         <TrustNotice compact onNavigate={onNavigate} />
@@ -1683,17 +1686,17 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
             <div style={{ position: "relative" }}>
               <input value={form.scholarship} onChange={set("scholarship")} placeholder="e.g. Chevening, Fulbright, DAAD..." style={inputStyle} />
               {suggestions.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: "#1E293B", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, marginTop: 4, overflow: "hidden" }}>
+                <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: THEME.panelBackgroundStrong, border: `1px solid ${THEME.panelBorder}`, borderRadius: 8, marginTop: 4, overflow: "hidden", boxShadow: THEME.panelShadow }}>
                   {suggestions.map((suggestion) => (
                     <div key={`${suggestion.source}-${suggestion.name}`} onClick={() => { setForm((current) => ({ ...current, scholarship: suggestion.name })); setSuggestions([]); }}
-                      style={{ padding: "8px 14px", fontSize: 13, color: "#E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                      style={{ padding: "8px 14px", fontSize: 13, color: THEME.textPrimary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
                       <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
                         <span style={{ color: suggestion.source === "community" ? "#F59E0B" : "#059669", fontSize: 11 }}>
                           {suggestion.source === "community" ? "⊕" : "✓"}
                         </span>
                         <span>{suggestion.name}</span>
                       </span>
-                      <span style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                      <span style={{ fontSize: 10, color: THEME.textMuted, textTransform: "uppercase", letterSpacing: 0.8 }}>
                         {suggestion.source}
                       </span>
                     </div>
@@ -1712,7 +1715,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
             </FormField>
             <FormField label="Study Level *" style={{ flex: 1 }}>
               <select value={form.level} onChange={set("level")} style={inputStyle}>
-                {LEVELS.map((level) => <option key={level} value={level} style={{ background: "#1E293B" }}>{level}</option>)}
+                {LEVELS.map((level) => <option key={level} value={level} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{level}</option>)}
               </select>
             </FormField>
           </div>
@@ -1723,7 +1726,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
             </FormField>
             <FormField label="Status *" style={{ flex: 1 }}>
               <select value={form.status} onChange={set("status")} style={inputStyle}>
-                {STATUSES.map((status) => <option key={status} value={status} style={{ background: "#1E293B" }}>{status}</option>)}
+                {STATUSES.map((status) => <option key={status} value={status} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{status}</option>)}
               </select>
             </FormField>
           </div>
@@ -1732,8 +1735,8 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
             <input type="date" value={form.date} onChange={set("date")} style={inputStyle} />
           </FormField>
 
-          <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16, marginTop: 4 }}>
-            <p style={{ color: "#475569", fontSize: 12, marginBottom: 12 }}>Optional — share only what you want</p>
+          <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, paddingTop: 16, marginTop: 4 }}>
+            <p style={{ color: THEME.textSoft, fontSize: 12, marginBottom: 12 }}>Optional — share only what you want</p>
             <div style={{ display: "flex", gap: 12 }}>
               <FormField label="Nationality" style={{ flex: 1 }}>
                 <input value={form.nationality} onChange={set("nationality")} placeholder="Optional" style={inputStyle} />
@@ -1764,24 +1767,24 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
 
   return (
     <div>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← Back to all results</button>
-      <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 28, marginBottom: 20 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← Back to all results</button>
+      <div style={{ ...panelStyle, borderRadius: 16, padding: 28, marginBottom: 20 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
           {verified && <span style={{ color: "#059669", fontSize: 14 }}>✓</span>}
-          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: "#E2E8F0", margin: 0 }}>{name}</h2>
+          <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, color: THEME.textPrimary, margin: 0 }}>{name}</h2>
         </div>
-        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 16, background: "rgba(255,255,255,0.05)" }}>
+        <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", marginBottom: 16, background: THEME.panelBackgroundMuted }}>
           {STATUSES.map((status) => statusCounts[status] > 0 ? <div key={status} style={{ width: `${(statusCounts[status] / Math.max(total, 1)) * 100}%`, background: STATUS_CONFIG[status].color }} /> : null)}
         </div>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           {STATUSES.map((status) => (
             <div key={status} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13 }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", background: STATUS_CONFIG[status].color }} />
-              <span style={{ color: "#94A3B8" }}>{status}:</span>
-              <span style={{ color: "#E2E8F0", fontWeight: 600 }}>{statusCounts[status]}</span>
+              <span style={{ color: THEME.textSecondary }}>{status}:</span>
+              <span style={{ color: THEME.textPrimary, fontWeight: 600 }}>{statusCounts[status]}</span>
             </div>
           ))}
-          <div style={{ marginLeft: "auto", fontSize: 13, color: "#64748B" }}>{total} public reports</div>
+          <div style={{ marginLeft: "auto", fontSize: 13, color: THEME.textMuted }}>{total} public reports</div>
         </div>
       </div>
       {record && (
@@ -1794,8 +1797,8 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
             <MetadataItem label="Results Timeline" value={record.results_timeline} />
             <MetadataItem label="Levels" value={record.levels?.join(", ")} />
           </div>
-          {record.description && <p style={{ color: "#94A3B8", fontSize: 13, lineHeight: 1.6, marginBottom: 10 }}>{record.description}</p>}
-          {record.eligibility_notes && <p style={{ color: "#64748B", fontSize: 12, lineHeight: 1.6, marginBottom: 12 }}>{record.eligibility_notes}</p>}
+          {record.description && <p style={{ color: THEME.textSecondary, fontSize: 13, lineHeight: 1.6, marginBottom: 10 }}>{record.description}</p>}
+          {record.eligibility_notes && <p style={{ color: THEME.textMuted, fontSize: 12, lineHeight: 1.6, marginBottom: 12 }}>{record.eligibility_notes}</p>}
           {record.website && <a href={record.website} target="_blank" rel="noreferrer" style={{ color: "#38BDF8", fontSize: 13, textDecoration: "none" }}>Visit official scholarship website →</a>}
         </div>
       )}
@@ -1803,7 +1806,7 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
         <div style={{ ...panelStyle, textAlign: "center", padding: 32 }}>
           <div style={{ fontSize: 34, marginBottom: 10 }}>⌛</div>
           <h3 style={{ ...panelTitle, marginBottom: 8 }}>No public reports yet</h3>
-          <p style={{ color: "#64748B", fontSize: 13, margin: 0 }}>
+          <p style={{ color: THEME.textMuted, fontSize: 13, margin: 0 }}>
             This scholarship already has a catalog page, but Awaited has not published any public reports for it yet.
           </p>
         </div>
@@ -1836,14 +1839,14 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
 function PolicyPage({ title, intro, sections, onBack, onNavigate }) {
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
         ← Back to results
       </button>
       <div style={{ ...panelStyle, padding: "28px 30px", marginBottom: 18 }}>
-        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: "#E2E8F0", marginTop: 0, marginBottom: 10 }}>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: THEME.textPrimary, marginTop: 0, marginBottom: 10 }}>
           {title}
         </h2>
-        <p style={{ color: "#94A3B8", fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+        <p style={{ color: THEME.textSecondary, fontSize: 14, lineHeight: 1.7, margin: 0 }}>
           {intro}
         </p>
       </div>
@@ -1856,7 +1859,7 @@ function PolicyPage({ title, intro, sections, onBack, onNavigate }) {
               {section.items.map((item) => (
                 <div key={item} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
                   <span style={{ color: "#38BDF8", fontSize: 13, lineHeight: 1.7 }}>•</span>
-                  <p style={{ margin: 0, color: "#CBD5E1", fontSize: 14, lineHeight: 1.7 }}>{item}</p>
+                  <p style={{ margin: 0, color: THEME.textSecondary, fontSize: 14, lineHeight: 1.7 }}>{item}</p>
                 </div>
               ))}
             </div>
@@ -1865,7 +1868,7 @@ function PolicyPage({ title, intro, sections, onBack, onNavigate }) {
       </div>
 
       <div style={{ ...panelStyle, marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: "#64748B", marginRight: "auto" }}>Read the rest of the trust pages:</span>
+        <span style={{ fontSize: 12, color: THEME.textMuted, marginRight: "auto" }}>Read the rest of the trust pages:</span>
         <FooterLink onClick={() => onNavigate("privacy")}>Privacy</FooterLink>
         <FooterLink onClick={() => onNavigate("community")}>Community Rules</FooterLink>
         <FooterLink onClick={() => onNavigate("disclaimer")}>Disclaimer</FooterLink>
@@ -1879,7 +1882,7 @@ function SiteFooter({ onNavigate }) {
     <footer style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px 28px" }}>
       <div
         style={{
-          borderTop: "1px solid rgba(255,255,255,0.06)",
+          borderTop: `1px solid ${THEME.panelBorderSoft}`,
           paddingTop: 18,
           display: "flex",
           justifyContent: "space-between",
@@ -1888,7 +1891,7 @@ function SiteFooter({ onNavigate }) {
           flexWrap: "wrap",
         }}
       >
-        <div style={{ fontSize: 12, color: "#64748B" }}>
+        <div style={{ fontSize: 12, color: THEME.textMuted }}>
           Awaited is a community reporting platform. Scholarship outcomes here are user-submitted and not official decisions.
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -1906,11 +1909,11 @@ function FooterLink({ children, onClick }) {
     <button
       onClick={onClick}
       style={{
-        background: "none",
-        border: "1px solid rgba(255,255,255,0.08)",
+        background: THEME.panelBackgroundStrong,
+        border: `1px solid ${THEME.panelBorder}`,
         borderRadius: 999,
         padding: "7px 12px",
-        color: "#94A3B8",
+        color: THEME.textSecondary,
         fontSize: 12,
         cursor: "pointer",
       }}
@@ -1926,9 +1929,9 @@ function MetadataItem({ label, value }) {
   }
 
   return (
-    <div style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
-      <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 13, color: "#E2E8F0", lineHeight: 1.5 }}>{value}</div>
+    <div style={{ padding: "10px 12px", borderRadius: 10, background: THEME.panelBackgroundSubtle, border: `1px solid ${THEME.panelBorderSoft}` }}>
+      <div style={{ fontSize: 10, color: THEME.textMuted, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, color: THEME.textPrimary, lineHeight: 1.5 }}>{value}</div>
     </div>
   );
 }
@@ -1936,7 +1939,7 @@ function MetadataItem({ label, value }) {
 function FormField({ label, children, style }) {
   return (
     <div style={style}>
-      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</label>
+      <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: THEME.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</label>
       {children}
     </div>
   );
@@ -1962,7 +1965,7 @@ function TurnstileGate({ onVerify, resetKey }) {
         containerRef.current.innerHTML = "";
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: turnstileSiteKey,
-          theme: "dark",
+          theme: "light",
           callback: (token) => onVerify(token),
           "expired-callback": () => onVerify(""),
           "error-callback": () => onVerify(""),
@@ -1985,43 +1988,3 @@ function TurnstileGate({ onVerify, resetKey }) {
 
   return <div ref={containerRef} style={{ minHeight: 68 }} />;
 }
-
-const inputStyle = {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.1)",
-  background: "rgba(255,255,255,0.05)",
-  color: "#E2E8F0",
-  fontSize: 14,
-  outline: "none",
-  fontFamily: "inherit",
-  boxSizing: "border-box",
-};
-
-const panelStyle = {
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  borderRadius: 14,
-  padding: "20px 22px",
-};
-
-const panelTitle = {
-  fontSize: 14,
-  fontWeight: 700,
-  color: "#E2E8F0",
-  marginBottom: 14,
-  marginTop: 0,
-};
-
-const primaryButtonStyle = {
-  padding: "14px 0",
-  borderRadius: 12,
-  border: "none",
-  width: "100%",
-  background: "linear-gradient(135deg, #6366F1, #818CF8)",
-  color: "#fff",
-  fontSize: 15,
-  fontWeight: 700,
-  cursor: "pointer",
-};

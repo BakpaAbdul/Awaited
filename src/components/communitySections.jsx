@@ -1,39 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildExcerpt } from "../lib/content";
 import { hasStoredHumanTrust } from "../lib/humanVerification";
+import { THEME, inputStyle, panelStyle, primaryButtonStyle } from "../lib/theme";
 import { loadTurnstileScript } from "../lib/turnstile";
 import { turnstileSiteKey } from "../lib/supabaseClient";
-
-const panelStyle = {
-  background: "rgba(255,255,255,0.03)",
-  border: "1px solid rgba(255,255,255,0.06)",
-  borderRadius: 14,
-  padding: "20px 22px",
-};
-
-const inputStyle = {
-  width: "100%",
-  padding: "10px 14px",
-  borderRadius: 10,
-  border: "1px solid rgba(255,255,255,0.1)",
-  background: "rgba(255,255,255,0.05)",
-  color: "#E2E8F0",
-  fontSize: 14,
-  outline: "none",
-  fontFamily: "inherit",
-  boxSizing: "border-box",
-};
-
-const primaryButtonStyle = {
-  padding: "12px 18px",
-  borderRadius: 12,
-  border: "none",
-  background: "linear-gradient(135deg, #6366F1, #818CF8)",
-  color: "#fff",
-  fontSize: 14,
-  fontWeight: 700,
-  cursor: "pointer",
-};
 
 function TurnstileGate({ onVerify, resetKey }) {
   const containerRef = useRef(null);
@@ -55,7 +25,7 @@ function TurnstileGate({ onVerify, resetKey }) {
         containerRef.current.innerHTML = "";
         widgetIdRef.current = turnstile.render(containerRef.current, {
           sitekey: turnstileSiteKey,
-          theme: "dark",
+          theme: "light",
           callback: (token) => onVerify(token),
           "expired-callback": () => onVerify(""),
           "error-callback": () => onVerify(""),
@@ -84,8 +54,8 @@ function SectionHeader({ eyebrow, title, description, action }) {
     <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap", marginBottom: 20 }}>
       <div style={{ flex: 1, minWidth: 240 }}>
         {eyebrow && <div style={{ fontSize: 11, color: "#38BDF8", textTransform: "uppercase", letterSpacing: 1.1, fontWeight: 700, marginBottom: 8 }}>{eyebrow}</div>}
-        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 700, color: "#E2E8F0", margin: 0 }}>{title}</h2>
-        {description && <p style={{ color: "#94A3B8", fontSize: 14, lineHeight: 1.7, marginTop: 8, marginBottom: 0 }}>{description}</p>}
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, fontWeight: 700, color: THEME.textPrimary, margin: 0 }}>{title}</h2>
+        {description && <p style={{ color: THEME.textSecondary, fontSize: 14, lineHeight: 1.7, marginTop: 8, marginBottom: 0 }}>{description}</p>}
       </div>
       {action}
     </div>
@@ -122,8 +92,8 @@ export function BlogIndex({ posts, onOpenPost }) {
       {publishedPosts.length === 0 ? (
         <div style={{ ...panelStyle, textAlign: "center", padding: 36 }}>
           <div style={{ fontSize: 36, marginBottom: 10 }}>✍️</div>
-          <div style={{ fontSize: 16, color: "#E2E8F0", fontWeight: 700, marginBottom: 8 }}>No blog posts yet</div>
-          <div style={{ fontSize: 13, color: "#64748B" }}>Your first published post will appear here.</div>
+          <div style={{ fontSize: 16, color: THEME.textPrimary, fontWeight: 700, marginBottom: 8 }}>No blog posts yet</div>
+          <div style={{ fontSize: 13, color: THEME.textMuted }}>Your first published post will appear here.</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -134,10 +104,10 @@ export function BlogIndex({ posts, onOpenPost }) {
               style={{ ...panelStyle, textAlign: "left", cursor: "pointer" }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 8 }}>
-                <h3 style={{ margin: 0, color: "#E2E8F0", fontSize: 20, fontWeight: 700 }}>{post.title}</h3>
-                <span style={{ fontSize: 12, color: "#64748B", whiteSpace: "nowrap" }}>{formatDate(post.createdAt)}</span>
+                <h3 style={{ margin: 0, color: THEME.textPrimary, fontSize: 20, fontWeight: 700 }}>{post.title}</h3>
+                <span style={{ fontSize: 12, color: THEME.textMuted, whiteSpace: "nowrap" }}>{formatDate(post.createdAt)}</span>
               </div>
-              <p style={{ margin: 0, color: "#94A3B8", fontSize: 14, lineHeight: 1.7 }}>{post.excerpt || buildExcerpt(post.content)}</p>
+              <p style={{ margin: 0, color: THEME.textSecondary, fontSize: 14, lineHeight: 1.7 }}>{post.excerpt || buildExcerpt(post.content)}</p>
             </button>
           ))}
         </div>
@@ -149,20 +119,20 @@ export function BlogIndex({ posts, onOpenPost }) {
 export function BlogPostView({ post, onBack }) {
   return (
     <div style={{ maxWidth: 820, margin: "0 auto" }}>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
         ← Back to blog
       </button>
       <article style={{ ...panelStyle, padding: "28px 30px" }}>
         <div style={{ fontSize: 12, color: "#38BDF8", textTransform: "uppercase", letterSpacing: 1.1, fontWeight: 700, marginBottom: 10 }}>
           Blog Post
         </div>
-        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 34, lineHeight: 1.2, marginTop: 0, marginBottom: 10, color: "#E2E8F0" }}>{post.title}</h1>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 22, fontSize: 12, color: "#64748B" }}>
+        <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 34, lineHeight: 1.2, marginTop: 0, marginBottom: 10, color: THEME.textPrimary }}>{post.title}</h1>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 22, fontSize: 12, color: THEME.textMuted }}>
           <span>{formatDate(post.createdAt)}</span>
           {post.authorEmail && <span>By {post.authorEmail}</span>}
           {!post.published && <span style={{ color: "#F59E0B" }}>Draft</span>}
         </div>
-        <div style={{ color: "#CBD5E1", fontSize: 15, lineHeight: 1.9, whiteSpace: "pre-wrap" }}>{post.content}</div>
+        <div style={{ color: THEME.textSecondary, fontSize: 15, lineHeight: 1.9, whiteSpace: "pre-wrap" }}>{post.content}</div>
       </article>
     </div>
   );
@@ -214,14 +184,14 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
       />
 
       <div style={{ ...panelStyle, marginBottom: 18 }}>
-        <div style={{ fontSize: 16, color: "#E2E8F0", fontWeight: 700, marginBottom: 10 }}>Start a new discussion</div>
+        <div style={{ fontSize: 16, color: THEME.textPrimary, fontWeight: 700, marginBottom: 10 }}>Start a new discussion</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Thread title" style={inputStyle} />
           <textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="What do you want to ask or discuss?" rows={5} style={{ ...inputStyle, resize: "vertical" }} />
           <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
           {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>Forum posts are anonymous and can be queued for moderation if they look risky.</div>
+            <div style={{ fontSize: 12, color: THEME.textMuted }}>Forum posts are anonymous and can be queued for moderation if they look risky.</div>
             <button
               onClick={handleCreate}
               disabled={!title.trim() || !body.trim() || (requiresCaptcha && !captchaToken)}
@@ -240,8 +210,8 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
       {visibleThreads.length === 0 ? (
         <div style={{ ...panelStyle, textAlign: "center", padding: 32 }}>
           <div style={{ fontSize: 34, marginBottom: 10 }}>💬</div>
-          <div style={{ fontSize: 16, color: "#E2E8F0", fontWeight: 700, marginBottom: 8 }}>No forum threads yet</div>
-          <div style={{ fontSize: 13, color: "#64748B" }}>Start the first discussion and invite the community in.</div>
+          <div style={{ fontSize: 16, color: THEME.textPrimary, fontWeight: 700, marginBottom: 8 }}>No forum threads yet</div>
+          <div style={{ fontSize: 13, color: THEME.textMuted }}>Start the first discussion and invite the community in.</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -254,15 +224,15 @@ export function ForumIndex({ threads, isAdmin, onOpenThread, onCreateThread }) {
               <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 8 }}>
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                    <h3 style={{ margin: 0, color: "#E2E8F0", fontSize: 18, fontWeight: 700 }}>{thread.title}</h3>
+                    <h3 style={{ margin: 0, color: THEME.textPrimary, fontSize: 18, fontWeight: 700 }}>{thread.title}</h3>
                     {thread.locked && <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}>LOCKED</span>}
                     {isAdmin && <ReviewChip reviewState={thread.reviewState} moderationReason={thread.moderationReason} />}
                   </div>
-                  <p style={{ margin: 0, color: "#94A3B8", fontSize: 14, lineHeight: 1.7 }}>{buildExcerpt(thread.body, 220)}</p>
+                  <p style={{ margin: 0, color: THEME.textSecondary, fontSize: 14, lineHeight: 1.7 }}>{buildExcerpt(thread.body, 220)}</p>
                 </div>
                 <div style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                  <div style={{ fontSize: 12, color: "#64748B" }}>{formatDate(thread.createdAt)}</div>
-                  <div style={{ fontSize: 12, color: "#64748B", marginTop: 4 }}>{thread.replies.length} replies</div>
+                  <div style={{ fontSize: 12, color: THEME.textMuted }}>{formatDate(thread.createdAt)}</div>
+                  <div style={{ fontSize: 12, color: THEME.textMuted, marginTop: 4 }}>{thread.replies.length} replies</div>
                 </div>
               </div>
             </button>
@@ -298,7 +268,7 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
 
   return (
     <div style={{ maxWidth: 860, margin: "0 auto" }}>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: THEME.textMuted, fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
         ← Back to forum
       </button>
 
@@ -306,29 +276,29 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", marginBottom: 10 }}>
           <div>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 8 }}>
-              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, lineHeight: 1.2, margin: 0, color: "#E2E8F0" }}>{thread.title}</h1>
+              <h1 style={{ fontFamily: "'Playfair Display', serif", fontSize: 30, lineHeight: 1.2, margin: 0, color: THEME.textPrimary }}>{thread.title}</h1>
               {thread.locked && <span style={{ fontSize: 10, color: "#F59E0B", fontWeight: 700 }}>LOCKED</span>}
               {isAdmin && <ReviewChip reviewState={thread.reviewState} moderationReason={thread.moderationReason} />}
             </div>
-            <div style={{ fontSize: 12, color: "#64748B" }}>{formatDate(thread.createdAt)} · {visibleReplies.length} visible replies</div>
+            <div style={{ fontSize: 12, color: THEME.textMuted }}>{formatDate(thread.createdAt)} · {visibleReplies.length} visible replies</div>
           </div>
         </div>
-        <div style={{ color: "#CBD5E1", fontSize: 15, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{thread.body}</div>
+        <div style={{ color: THEME.textSecondary, fontSize: 15, lineHeight: 1.8, whiteSpace: "pre-wrap" }}>{thread.body}</div>
       </div>
 
       <div style={{ ...panelStyle, marginBottom: 18 }}>
-        <div style={{ fontSize: 16, color: "#E2E8F0", fontWeight: 700, marginBottom: 12 }}>Replies</div>
+        <div style={{ fontSize: 16, color: THEME.textPrimary, fontWeight: 700, marginBottom: 12 }}>Replies</div>
         {visibleReplies.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#64748B" }}>No replies yet.</div>
+          <div style={{ fontSize: 13, color: THEME.textMuted }}>No replies yet.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {visibleReplies.map((reply) => (
-              <div key={reply.id} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div key={reply.id} style={{ padding: "12px 14px", borderRadius: 12, background: THEME.panelBackgroundSubtle, border: `1px solid ${THEME.panelBorderSoft}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
-                  <span style={{ color: "#64748B", fontSize: 11 }}>Anonymous · {formatDate(reply.createdAt)}</span>
+                  <span style={{ color: THEME.textMuted, fontSize: 11 }}>Anonymous · {formatDate(reply.createdAt)}</span>
                   {isAdmin && <ReviewChip reviewState={reply.reviewState} moderationReason={reply.moderationReason} />}
                 </div>
-                <div style={{ color: "#CBD5E1", fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{reply.body}</div>
+                <div style={{ color: THEME.textSecondary, fontSize: 14, lineHeight: 1.7, whiteSpace: "pre-wrap" }}>{reply.body}</div>
               </div>
             ))}
           </div>
@@ -336,7 +306,7 @@ export function ForumThreadView({ thread, isAdmin, onBack, onReplySubmit }) {
       </div>
 
       <div style={{ ...panelStyle, opacity: thread.locked ? 0.7 : 1 }}>
-        <div style={{ fontSize: 16, color: "#E2E8F0", fontWeight: 700, marginBottom: 12 }}>Reply to this thread</div>
+        <div style={{ fontSize: 16, color: THEME.textPrimary, fontWeight: 700, marginBottom: 12 }}>Reply to this thread</div>
         {thread.locked ? (
           <div style={{ fontSize: 13, color: "#FBBF24" }}>This thread is locked. New replies are disabled.</div>
         ) : (
@@ -397,11 +367,11 @@ export function AdminBlogPanel({ posts, onSavePost, onDeletePost, onOpenPost }) 
       <div style={panelStyle}>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", marginBottom: 16 }}>
           <div>
-            <h3 style={{ margin: 0, color: "#E2E8F0", fontSize: 18, fontWeight: 700 }}>{editingId ? "Edit Blog Post" : "Write Blog Post"}</h3>
-            <p style={{ margin: "6px 0 0", fontSize: 12, color: "#64748B" }}>Write posts in plain text. Line breaks are preserved on the public site.</p>
+            <h3 style={{ margin: 0, color: THEME.textPrimary, fontSize: 18, fontWeight: 700 }}>{editingId ? "Edit Blog Post" : "Write Blog Post"}</h3>
+            <p style={{ margin: "6px 0 0", fontSize: 12, color: THEME.textMuted }}>Write posts in plain text. Line breaks are preserved on the public site.</p>
           </div>
           {editingId && (
-            <button onClick={resetForm} style={{ background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, color: "#94A3B8", fontSize: 12, cursor: "pointer", padding: "8px 12px" }}>
+            <button onClick={resetForm} style={{ background: THEME.panelBackgroundStrong, border: `1px solid ${THEME.panelBorder}`, borderRadius: 10, color: THEME.textSecondary, fontSize: 12, cursor: "pointer", padding: "8px 12px" }}>
               New Draft
             </button>
           )}
@@ -412,13 +382,13 @@ export function AdminBlogPanel({ posts, onSavePost, onDeletePost, onOpenPost }) 
           <input value={form.excerpt} onChange={(event) => setForm((current) => ({ ...current, excerpt: event.target.value }))} placeholder="Optional short excerpt" style={inputStyle} />
           <textarea value={form.content} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} rows={12} placeholder="Write your blog post..." style={{ ...inputStyle, resize: "vertical" }} />
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "#CBD5E1" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: THEME.textSecondary }}>
             <input type="checkbox" checked={form.published} onChange={(event) => setForm((current) => ({ ...current, published: event.target.checked }))} />
             Publish immediately
           </label>
 
           <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-            <div style={{ fontSize: 12, color: "#64748B" }}>
+            <div style={{ fontSize: 12, color: THEME.textMuted }}>
               Excerpt preview: {form.excerpt.trim() || buildExcerpt(form.content) || "No excerpt yet"}
             </div>
             <button
@@ -433,23 +403,23 @@ export function AdminBlogPanel({ posts, onSavePost, onDeletePost, onOpenPost }) 
       </div>
 
       <div style={panelStyle}>
-        <h3 style={{ marginTop: 0, marginBottom: 14, color: "#E2E8F0", fontSize: 18, fontWeight: 700 }}>Existing Posts</h3>
+        <h3 style={{ marginTop: 0, marginBottom: 14, color: THEME.textPrimary, fontSize: 18, fontWeight: 700 }}>Existing Posts</h3>
         {sortedPosts.length === 0 ? (
-          <div style={{ fontSize: 13, color: "#64748B" }}>No blog posts yet.</div>
+          <div style={{ fontSize: 13, color: THEME.textMuted }}>No blog posts yet.</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {sortedPosts.map((post) => (
-              <div key={post.id} style={{ padding: "12px 14px", borderRadius: 12, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div key={post.id} style={{ padding: "12px 14px", borderRadius: 12, background: THEME.panelBackgroundSubtle, border: `1px solid ${THEME.panelBorderSoft}` }}>
                 <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
                   <div style={{ flex: 1 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: "#E2E8F0" }}>{post.title}</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: THEME.textPrimary }}>{post.title}</span>
                       <span style={{ fontSize: 10, color: post.published ? "#10B981" : "#F59E0B", fontWeight: 700 }}>
                         {post.published ? "PUBLISHED" : "DRAFT"}
                       </span>
                     </div>
-                    <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{formatDate(post.createdAt)} · {post.slug}</div>
-                    <div style={{ fontSize: 13, color: "#94A3B8" }}>{post.excerpt || buildExcerpt(post.content)}</div>
+                    <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>{formatDate(post.createdAt)} · {post.slug}</div>
+                    <div style={{ fontSize: 13, color: THEME.textSecondary }}>{post.excerpt || buildExcerpt(post.content)}</div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                     <button
@@ -466,7 +436,7 @@ export function AdminBlogPanel({ posts, onSavePost, onDeletePost, onOpenPost }) 
                     >
                       Edit
                     </button>
-                    <button onClick={() => onOpenPost(post.slug)} style={{ background: "none", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, color: "#94A3B8", fontSize: 12, cursor: "pointer", padding: "8px 12px" }}>
+                    <button onClick={() => onOpenPost(post.slug)} style={{ background: THEME.panelBackgroundStrong, border: `1px solid ${THEME.panelBorder}`, borderRadius: 10, color: THEME.textSecondary, fontSize: 12, cursor: "pointer", padding: "8px 12px" }}>
                       Preview
                     </button>
                     <button onClick={() => onDeletePost(post.id)} style={{ background: "none", border: "1px solid rgba(220,38,38,0.18)", borderRadius: 10, color: "#FCA5A5", fontSize: 12, cursor: "pointer", padding: "8px 12px" }}>

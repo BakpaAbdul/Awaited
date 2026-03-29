@@ -1,11 +1,10 @@
-import { SEED_RESULTS } from "./constants";
 import {
   getCanonicalScholarshipName,
   isDatabaseScholarship,
   sortScholarshipNames,
 } from "./scholarships";
 
-const STORAGE_KEY = "awaited:app-data:v1";
+const STORAGE_KEY = "awaited:app-data:v2";
 
 function normalizeComments(comments = [], resultId = "result") {
   return comments
@@ -36,7 +35,7 @@ function normalizeResults(results = []) {
 }
 
 export function normalizeAppData(appData = {}) {
-  const results = normalizeResults(Array.isArray(appData.results) ? appData.results : SEED_RESULTS);
+  const results = normalizeResults(Array.isArray(appData.results) ? appData.results : []);
   const manualVerified = sortScholarshipNames(
     (Array.isArray(appData.verifiedList) ? appData.verifiedList : [])
       .map((name) => getCanonicalScholarshipName(name))

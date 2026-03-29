@@ -22,6 +22,109 @@ const INITIAL_ROUTE =
     ? parseAppRoute(window.location.pathname)
     : { view: "feed", scholarshipSlug: null };
 
+const TRUST_PAGES = {
+  privacy: {
+    title: "Privacy Policy",
+    intro:
+      "Awaited is built around anonymous scholarship reporting. We keep the data we collect as limited as possible and use it only to run the service, reduce abuse, and moderate community content.",
+    sections: [
+      {
+        heading: "What Awaited collects",
+        items: [
+          "Anonymous report fields such as scholarship name, country, level, field, outcome dates, notes, and anonymous comments.",
+          "Technical anti-abuse data such as CAPTCHA verification results, IP-derived fingerprint hashes, and moderation metadata used to slow spam and repeated abuse.",
+          "Moderator account details for authorized admins who sign in to review queued content.",
+        ],
+      },
+      {
+        heading: "How Awaited uses that data",
+        items: [
+          "To publish public scholarship timelines and community signals.",
+          "To review, approve, reject, hide, or delete suspicious content.",
+          "To secure the service, investigate abuse, and keep the feed usable.",
+        ],
+      },
+      {
+        heading: "What you should never post",
+        items: [
+          "Do not post passport numbers, application IDs, email addresses, phone numbers, bank details, admission documents, or any other personal identifiers.",
+          "Do not post information that could expose another applicant without their consent.",
+        ],
+      },
+      {
+        heading: "Retention and moderation",
+        items: [
+          "Approved submissions can remain public until removed by a moderator or the original service policy changes.",
+          "Rejected, hidden, and anti-abuse records can be retained for security and moderation purposes.",
+        ],
+      },
+    ],
+  },
+  community: {
+    title: "Community Rules",
+    intro:
+      "Awaited works only if reports are honest, useful, and safe for other applicants. These rules apply to reports, comments, and scholarship-name submissions.",
+    sections: [
+      {
+        heading: "Post accurate scholarship updates",
+        items: [
+          "Submit only real updates about your own scholarship process or first-hand experience.",
+          "Do not invent outcomes, impersonate committees, or post rumor as fact.",
+        ],
+      },
+      {
+        heading: "Protect anonymity",
+        items: [
+          "Keep posts free of phone numbers, email addresses, usernames, links, or other identifying information.",
+          "Do not pressure others to contact you off-platform.",
+        ],
+      },
+      {
+        heading: "Respect other applicants",
+        items: [
+          "No harassment, abuse, discrimination, threats, or mocking of rejected applicants.",
+          "No marketing, fundraising, lead generation, or unrelated promotion.",
+        ],
+      },
+      {
+        heading: "Moderation outcomes",
+        items: [
+          "Awaited may queue, reject, hide, or delete posts that look misleading, abusive, or spammy.",
+          "Repeat abuse can result in stricter automated filtering or permanent removal of content.",
+        ],
+      },
+    ],
+  },
+  disclaimer: {
+    title: "Community Disclaimer",
+    intro:
+      "Awaited is a community reporting platform, not an official scholarship authority. Every public result is a user-submitted signal and should be read with caution.",
+    sections: [
+      {
+        heading: "Not official scholarship communication",
+        items: [
+          "Awaited is not operated by scholarship providers, universities, embassies, or government agencies.",
+          "A post on Awaited does not confirm that decisions have officially been released.",
+        ],
+      },
+      {
+        heading: "Use Awaited as a signal, not proof",
+        items: [
+          "Community reports can be incomplete, mistaken, delayed, or malicious even after moderation.",
+          "Always verify timelines and eligibility details through the official scholarship website, email, or portal.",
+        ],
+      },
+      {
+        heading: "No professional advice",
+        items: [
+          "Awaited does not provide legal, immigration, financial, or admissions advice.",
+          "You remain responsible for your own application decisions and document security.",
+        ],
+      },
+    ],
+  },
+};
+
 export default function AwaitedApp() {
   const flashTimerRef = useRef(null);
   const [appData, setAppData] = useState(() => appDataStore.getInitialAppData());
@@ -160,6 +263,11 @@ export default function AwaitedApp() {
       return;
     }
 
+    if (TRUST_PAGES[view]) {
+      document.title = `Awaited — ${TRUST_PAGES[view].title}`;
+      return;
+    }
+
     document.title = "Awaited — Scholarship Results Tracker";
   }, [view, selectedScholarship]);
 
@@ -177,6 +285,12 @@ export default function AwaitedApp() {
 
     if (nextView === "submit") {
       pathname = "/submit";
+    } else if (nextView === "privacy") {
+      pathname = "/privacy";
+    } else if (nextView === "community") {
+      pathname = "/community";
+    } else if (nextView === "disclaimer") {
+      pathname = "/disclaimer";
     } else if (nextView === "login") {
       pathname = "/admin/login";
     } else if (nextView === "admin") {
@@ -420,6 +534,7 @@ export default function AwaitedApp() {
   };
 
   const resolvedView = view === "admin" && !isAdmin ? "login" : view;
+  const trustPage = TRUST_PAGES[resolvedView] || null;
 
   return (
     <div style={{ fontFamily: "'DM Sans', 'Segoe UI', system-ui, sans-serif", minHeight: "100vh", background: "linear-gradient(180deg, #0F172A 0%, #1E293B 100%)", color: "#E2E8F0" }}>
@@ -749,6 +864,8 @@ export default function AwaitedApp() {
 
         {resolvedView === "feed" && (
           <>
+            <TrustNotice onNavigate={applyRoute} />
+
             <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
               <StatChip label="Total Reports" value={stats.total} color="#94A3B8" />
               {STATUSES.map((status) => (
@@ -779,10 +896,14 @@ export default function AwaitedApp() {
             </div>
 
             {filtered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: 60, color: "#475569" }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>∅</div>
-                <div style={{ fontSize: 15 }}>No results match your filters</div>
-              </div>
+              visibleResults.length === 0 ? (
+                <EmptyFeedState onSubmit={() => applyRoute("submit")} />
+              ) : (
+                <div style={{ textAlign: "center", padding: 60, color: "#475569" }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>∅</div>
+                  <div style={{ fontSize: 15 }}>No results match your filters</div>
+                </div>
+              )
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 {filtered.map((result) => (
@@ -813,8 +934,19 @@ export default function AwaitedApp() {
           <SubmitForm
             onSubmit={handleSubmit}
             onCancel={() => applyRoute("feed")}
+            onNavigate={applyRoute}
             verifiedScholarships={verifiedList}
             customScholarships={customScholarships}
+          />
+        )}
+
+        {trustPage && (
+          <PolicyPage
+            title={trustPage.title}
+            intro={trustPage.intro}
+            sections={trustPage.sections}
+            onBack={() => applyRoute("feed")}
+            onNavigate={applyRoute}
           />
         )}
 
@@ -846,6 +978,8 @@ export default function AwaitedApp() {
           </div>
         )}
       </main>
+
+      <SiteFooter onNavigate={applyRoute} />
 
       <style>{`
         @keyframes slideDown { from { opacity: 0; transform: translate(-50%, -20px); } to { opacity: 1; transform: translate(-50%, 0); } }
@@ -906,6 +1040,54 @@ function StatChip({ label, value, color, onClick, active }) {
       <span style={{ fontSize: 12, color: "#94A3B8" }}>{label}</span>
       <span style={{ fontSize: 13, fontWeight: 700 }}>{value}</span>
     </button>
+  );
+}
+
+function TrustNotice({ onNavigate, compact = false }) {
+  return (
+    <div
+      style={{
+        ...panelStyle,
+        marginBottom: compact ? 20 : 24,
+        padding: compact ? "16px 18px" : "18px 20px",
+        background: "rgba(56,189,248,0.06)",
+        border: "1px solid rgba(56,189,248,0.14)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: "#7DD3FC", textTransform: "uppercase", letterSpacing: 1, marginBottom: 6 }}>
+            Trust Notice
+          </div>
+          <div style={{ fontSize: compact ? 14 : 15, fontWeight: 700, color: "#E2E8F0", marginBottom: 6 }}>
+            Awaited shows user-submitted scholarship signals, not official scholarship decisions.
+          </div>
+          <div style={{ fontSize: 13, lineHeight: 1.6, color: "#94A3B8" }}>
+            Treat every report as community intelligence. Verify final decisions through the official scholarship portal, email, or provider website, and never post personal identifiers.
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <FooterLink onClick={() => onNavigate("privacy")}>Privacy</FooterLink>
+          <FooterLink onClick={() => onNavigate("community")}>Rules</FooterLink>
+          <FooterLink onClick={() => onNavigate("disclaimer")}>Disclaimer</FooterLink>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EmptyFeedState({ onSubmit }) {
+  return (
+    <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
+      <div style={{ fontSize: 40, marginBottom: 10 }}>⌛</div>
+      <h3 style={{ ...panelTitle, marginBottom: 8 }}>No public scholarship reports yet</h3>
+      <p style={{ color: "#94A3B8", fontSize: 14, lineHeight: 1.6, maxWidth: 560, margin: "0 auto 18px" }}>
+        Awaited is now running with a clean live dataset. The next public report will come from a real community submission, not seeded beta content.
+      </p>
+      <button onClick={onSubmit} style={{ ...primaryButtonStyle, width: "auto", padding: "12px 22px" }}>
+        Submit the first report
+      </button>
+    </div>
   );
 }
 
@@ -1102,7 +1284,7 @@ function ResultCard({
   );
 }
 
-function SubmitForm({ onSubmit, onCancel, verifiedScholarships, customScholarships }) {
+function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, customScholarships }) {
   const [form, setForm] = useState({
     scholarship: "",
     country: "",
@@ -1155,6 +1337,7 @@ function SubmitForm({ onSubmit, onCancel, verifiedScholarships, customScholarshi
         <p style={{ color: "#64748B", fontSize: 13, marginBottom: 28 }}>
           Anonymous results now go through throttling and moderation. Known scholarships can publish immediately; risky or unknown reports can land in the review queue first.
         </p>
+        <TrustNotice compact onNavigate={onNavigate} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <FormField label="Scholarship Name *">
@@ -1277,27 +1460,124 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
           {record.website && <a href={record.website} target="_blank" rel="noreferrer" style={{ color: "#38BDF8", fontSize: 13, textDecoration: "none" }}>Visit official scholarship website →</a>}
         </div>
       )}
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {[...entries].sort((a, b) => new Date(b.date) - new Date(a.date)).map((result) => (
-          <ResultCard
-            key={result.id}
-            result={result}
-            expanded={expandedCard === result.id}
-            onToggle={() => setExpandedCard(expandedCard === result.id ? null : result.id)}
-            onScholarshipClick={() => {}}
-            commentText={newComments[result.id] || ""}
-            onCommentChange={(value) => setNewComments((current) => ({ ...current, [result.id]: value }))}
-            onCommentSubmit={(text, moderation) => onCommentSubmit(result.id, text, moderation)}
-            isAdmin={isAdmin}
-            onApprove={() => onApprove(result.id)}
-            onReject={() => onReject(result.id)}
-            onToggleHide={() => onToggleHide(result.id, !result.hidden)}
-            onDelete={() => onDelete(result.id)}
-            verified={verified}
-          />
+      {entries.length === 0 ? (
+        <div style={{ ...panelStyle, textAlign: "center", padding: 32 }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>⌛</div>
+          <h3 style={{ ...panelTitle, marginBottom: 8 }}>No public reports yet</h3>
+          <p style={{ color: "#64748B", fontSize: 13, margin: 0 }}>
+            This scholarship already has a catalog page, but Awaited has not published any public reports for it yet.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {[...entries].sort((a, b) => new Date(b.date) - new Date(a.date)).map((result) => (
+            <ResultCard
+              key={result.id}
+              result={result}
+              expanded={expandedCard === result.id}
+              onToggle={() => setExpandedCard(expandedCard === result.id ? null : result.id)}
+              onScholarshipClick={() => {}}
+              commentText={newComments[result.id] || ""}
+              onCommentChange={(value) => setNewComments((current) => ({ ...current, [result.id]: value }))}
+              onCommentSubmit={(text, moderation) => onCommentSubmit(result.id, text, moderation)}
+              isAdmin={isAdmin}
+              onApprove={() => onApprove(result.id)}
+              onReject={() => onReject(result.id)}
+              onToggleHide={() => onToggleHide(result.id, !result.hidden)}
+              onDelete={() => onDelete(result.id)}
+              verified={verified}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PolicyPage({ title, intro, sections, onBack, onNavigate }) {
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto" }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>
+        ← Back to results
+      </button>
+      <div style={{ ...panelStyle, padding: "28px 30px", marginBottom: 18 }}>
+        <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, fontWeight: 700, color: "#E2E8F0", marginTop: 0, marginBottom: 10 }}>
+          {title}
+        </h2>
+        <p style={{ color: "#94A3B8", fontSize: 14, lineHeight: 1.7, margin: 0 }}>
+          {intro}
+        </p>
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {sections.map((section) => (
+          <div key={section.heading} style={panelStyle}>
+            <h3 style={{ ...panelTitle, fontSize: 16, marginBottom: 10 }}>{section.heading}</h3>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {section.items.map((item) => (
+                <div key={item} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                  <span style={{ color: "#38BDF8", fontSize: 13, lineHeight: 1.7 }}>•</span>
+                  <p style={{ margin: 0, color: "#CBD5E1", fontSize: 14, lineHeight: 1.7 }}>{item}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
+
+      <div style={{ ...panelStyle, marginTop: 18, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <span style={{ fontSize: 12, color: "#64748B", marginRight: "auto" }}>Read the rest of the trust pages:</span>
+        <FooterLink onClick={() => onNavigate("privacy")}>Privacy</FooterLink>
+        <FooterLink onClick={() => onNavigate("community")}>Community Rules</FooterLink>
+        <FooterLink onClick={() => onNavigate("disclaimer")}>Disclaimer</FooterLink>
+      </div>
     </div>
+  );
+}
+
+function SiteFooter({ onNavigate }) {
+  return (
+    <footer style={{ maxWidth: 960, margin: "0 auto", padding: "0 20px 28px" }}>
+      <div
+        style={{
+          borderTop: "1px solid rgba(255,255,255,0.06)",
+          paddingTop: 18,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 12,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ fontSize: 12, color: "#64748B" }}>
+          Awaited is a community reporting platform. Scholarship outcomes here are user-submitted and not official decisions.
+        </div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <FooterLink onClick={() => onNavigate("privacy")}>Privacy Policy</FooterLink>
+          <FooterLink onClick={() => onNavigate("community")}>Community Rules</FooterLink>
+          <FooterLink onClick={() => onNavigate("disclaimer")}>Disclaimer</FooterLink>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function FooterLink({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        background: "none",
+        border: "1px solid rgba(255,255,255,0.08)",
+        borderRadius: 999,
+        padding: "7px 12px",
+        color: "#94A3B8",
+        fontSize: 12,
+        cursor: "pointer",
+      }}
+    >
+      {children}
+    </button>
   );
 }
 

@@ -7,6 +7,18 @@ export function parseAppRoute(pathname) {
     return { view: "submit", scholarshipSlug: null };
   }
 
+  if (pathname === "/privacy") {
+    return { view: "privacy", scholarshipSlug: null };
+  }
+
+  if (pathname === "/community") {
+    return { view: "community", scholarshipSlug: null };
+  }
+
+  if (pathname === "/disclaimer") {
+    return { view: "disclaimer", scholarshipSlug: null };
+  }
+
   if (pathname === "/admin") {
     return { view: "admin", scholarshipSlug: null };
   }

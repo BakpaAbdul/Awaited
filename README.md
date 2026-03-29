@@ -15,6 +15,7 @@ Users anonymously report their scholarship application outcomes (Applied → Int
 - **Search & filter** — find results by scholarship name, country, study level, or status.
 - **Scholarship pages** — click any scholarship to see its dedicated page with a visual status breakdown.
 - **Discussion threads** — comment anonymously on any result to ask questions or share tips.
+- **Trust pages** — privacy policy, community rules, and a clear disclaimer that reports are community-submitted and not official scholarship decisions.
 
 ### For admins
 - **Supabase Auth admin login** — real email/password session instead of a browser-only shared password.
@@ -30,7 +31,7 @@ Users anonymously report their scholarship application outcomes (Applied → Int
 | Layer | Technology | Notes |
 |-------|-----------|-------|
 | Frontend | React 18 + Vite | Fast dev server, optimized builds |
-| Hosting | Vercel (planned) | Auto-deploys from GitHub |
+| Hosting | Vercel | Production frontend deployment |
 | Database | Supabase | PostgreSQL + Edge Functions |
 | Styling | Inline styles | No CSS framework dependency |
 
@@ -80,7 +81,7 @@ In Supabase mode, moderation routes through the authenticated `admin-actions` Ed
 ### Supabase Setup
 1. Create a Supabase project.
 2. Run the SQL in [supabase/schema.sql](/Users/abdulbaari/Scholartrack/supabase/schema.sql) in the Supabase SQL editor.
-3. Optionally run [supabase/seed.sql](/Users/abdulbaari/Scholartrack/supabase/seed.sql) if you want the shared backend to start with the same beta sample reports as the frontend fallback.
+3. Leave [supabase/seed.sql](/Users/abdulbaari/Scholartrack/supabase/seed.sql) untouched for production. Shared environments should start with a clean report feed.
 4. Deploy the moderation Edge Function from [supabase/functions/admin-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/admin-actions/index.ts).
 5. Deploy the public posting Edge Function from [supabase/functions/public-actions/index.ts](/Users/abdulbaari/Scholartrack/supabase/functions/public-actions/index.ts).
 6. Create `.env.local` from `.env.example` and fill in:
@@ -173,15 +174,15 @@ awaited/
 - [x] Project scaffolded with Vite, ready for GitHub
 
 ### Phase 2 — Backend (Supabase)
-- [ ] Set up Supabase project and database tables
+- [x] Set up Supabase project and database tables
 - [x] Replace local-only state with Supabase-backed API calls plus browser-local fallback
 - [x] Move admin auth to Supabase Auth
 - [x] Real-time updates via Supabase subscriptions
 - [x] Add moderation queue and posting throttles
 
 ### Phase 3 — Deploy
-- [ ] Connect GitHub repo to Vercel
-- [ ] Configure environment variables on Vercel
+- [x] Connect GitHub repo to Vercel
+- [x] Configure environment variables on Vercel
 - [ ] Set up custom domain (awaited.org or similar)
 
 ### Phase 4 — Growth Features

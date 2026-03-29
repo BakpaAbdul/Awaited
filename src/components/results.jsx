@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { STATUS_CONFIG } from "../lib/constants";
 import { inputStyle, panelStyle, panelTitle, primaryButtonStyle, THEME } from "../lib/theme";
 import { hasStoredHumanTrust } from "../lib/humanVerification";
@@ -12,12 +12,12 @@ export function StatusBadge({ status }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        padding: "4px 10px",
+        padding: "5px 12px",
         borderRadius: 999,
         background: `${STATUS_CONFIG[status].color}18`,
         color: STATUS_CONFIG[status].color,
-        fontSize: 11,
-        fontWeight: 700,
+        fontSize: 12,
+        fontWeight: 800,
       }}
     >
       <span>{STATUS_CONFIG[status].icon}</span>
@@ -283,6 +283,8 @@ export function ResultCard({
   const [honeypot, setHoneypot] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const [focusComposerOnExpand, setFocusComposerOnExpand] = useState(false);
+  const commentInputRef = useRef(null);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
   const summaryItems = getResultSummaryItems(result);
   const detailsId = `result-details-${result.id}`;
@@ -316,6 +318,25 @@ export function ResultCard({
     ? result.comments
     : result.comments.filter((comment) => comment.reviewState === "approved");
 
+  useEffect(() => {
+    if (expanded && focusComposerOnExpand) {
+      commentInputRef.current?.focus();
+      setFocusComposerOnExpand(false);
+    }
+  }, [expanded, focusComposerOnExpand]);
+
+  const handleReplyClick = (event) => {
+    event.stopPropagation();
+
+    if (!expanded) {
+      setFocusComposerOnExpand(true);
+      onToggle();
+      return;
+    }
+
+    commentInputRef.current?.focus();
+  };
+
   return (
     <div
       style={{
@@ -327,9 +348,16 @@ export function ResultCard({
         boxShadow: THEME.panelShadow,
       }}
     >
-      <button
-        type="button"
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onToggle}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            onToggle();
+          }
+        }}
         aria-expanded={expanded}
         aria-controls={detailsId}
         style={{
@@ -340,7 +368,6 @@ export function ResultCard({
           gap: 16,
           cursor: "pointer",
           background: "transparent",
-          border: "none",
           textAlign: "left",
         }}
       >
@@ -363,7 +390,6 @@ export function ResultCard({
             >
               {result.scholarship}
             </span>
-            <StatusBadge status={result.status} />
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {result.hidden ? <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>HIDDEN</span> : null}
           </div>
@@ -379,13 +405,32 @@ export function ResultCard({
             </div>
           )}
         </div>
-        <div style={{ textAlign: "right", flexShrink: 0 }}>
-          <div style={{ fontSize: 12, color: THEME.textSoft }}>{formatResultDate(result.date)}</div>
-          {visibleComments.length > 0 ? (
-            <div style={{ fontSize: 11, color: THEME.textSoft, marginTop: 4 }}>💬 {visibleComments.length}</div>
-          ) : null}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <StatusBadge status={result.status} />
+            <button
+              type="button"
+              onClick={handleReplyClick}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 999,
+                border: `1px solid ${THEME.panelBorder}`,
+                background: THEME.panelBackgroundSubtle,
+                color: THEME.textPrimary,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              Reply
+            </button>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, color: THEME.textSoft, fontSize: 12 }}>
+            <span>{formatResultDate(result.date)}</span>
+            {visibleComments.length > 0 ? <span>💬 {visibleComments.length}</span> : null}
+          </div>
         </div>
-      </button>
+      </div>
 
       {expanded ? (
         <div id={detailsId} style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, padding: "16px 20px" }}>
@@ -501,6 +546,7 @@ export function ResultCard({
             ))}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 10 }}>
               <input
+                ref={commentInputRef}
                 type="text"
                 aria-label={`Add anonymous comment for ${result.scholarship}`}
                 placeholder="Add a comment anonymously..."

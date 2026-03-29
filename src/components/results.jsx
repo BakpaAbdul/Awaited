@@ -44,16 +44,51 @@ export function formatResultDate(value) {
   return parsed.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
-export function getResultSummaryTokens(result) {
+const SUMMARY_CHIP_CONFIG = {
+  country: { background: "#fee2e2", color: "#b91c1c" },
+  level: { background: "#dbeafe", color: "#1d4ed8" },
+  field: { background: "#ede9fe", color: "#6d28d9" },
+  cycleYear: { background: "#dcfce7", color: "#15803d" },
+  applicationRound: { background: "#fef3c7", color: "#b45309" },
+  nationality: { background: "#cffafe", color: "#0f766e" },
+  gpa: { background: "#e0f2fe", color: "#0369a1" },
+};
+
+export function getResultSummaryItems(result) {
   return [
-    result.country ? `📍 ${result.country}` : "",
-    result.level ? `🎓 ${result.level}` : "",
-    result.field ? `📚 ${result.field}` : "",
-    result.cycleYear ? `🗓 ${result.cycleYear}` : "",
-    result.applicationRound ? `🧭 ${result.applicationRound}` : "",
-    result.nationality ? `🌍 ${result.nationality}` : "",
-    result.gpa ? `📊 GPA: ${result.gpa}` : "",
+    result.country ? { key: "country", label: result.country } : null,
+    result.level ? { key: "level", label: result.level } : null,
+    result.field ? { key: "field", label: result.field } : null,
+    result.cycleYear ? { key: "cycleYear", label: result.cycleYear } : null,
+    result.applicationRound ? { key: "applicationRound", label: result.applicationRound } : null,
+    result.nationality ? { key: "nationality", label: result.nationality } : null,
+    result.gpa ? { key: "gpa", label: `GPA: ${result.gpa}` } : null,
   ].filter(Boolean);
+}
+
+export function SummaryChip({ item, compact = false }) {
+  const config = SUMMARY_CHIP_CONFIG[item.key] || {
+    background: THEME.panelBackgroundMuted,
+    color: THEME.textPrimary,
+  };
+
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: compact ? "4px 8px" : "5px 10px",
+        borderRadius: 10,
+        background: config.background,
+        color: config.color,
+        fontSize: compact ? 11 : 12,
+        fontWeight: 700,
+        lineHeight: 1.1,
+      }}
+    >
+      {item.label}
+    </span>
+  );
 }
 
 export function ModerationChip({ reviewState, reason }) {
@@ -164,7 +199,7 @@ export function ModerationResultRow({
   onVerifyName,
   onToggleHide,
 }) {
-  const summaryTokens = getResultSummaryTokens(result);
+  const summaryItems = getResultSummaryItems(result);
 
   return (
     <div
@@ -184,9 +219,13 @@ export function ModerationResultRow({
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {!verified ? <span style={{ fontSize: 10, color: "#D97706" }}>Unknown scholarship</span> : null}
           </div>
-          <div style={{ fontSize: 12, color: THEME.textMuted, marginBottom: 6 }}>
-            {summaryTokens.join(" · ")}
-            {result.date ? ` · ${formatResultDate(result.date)}` : ""}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 6, alignItems: "center" }}>
+            {summaryItems.map((item) => (
+              <SummaryChip key={`${result.id}-${item.key}-${item.label}`} item={item} compact />
+            ))}
+            {result.date ? (
+              <span style={{ fontSize: 12, color: THEME.textMuted }}>{formatResultDate(result.date)}</span>
+            ) : null}
           </div>
           {(result.university || result.program) && (
             <div style={{ fontSize: 12, color: THEME.textSoft, marginBottom: 6 }}>
@@ -245,7 +284,7 @@ export function ResultCard({
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
-  const summaryTokens = getResultSummaryTokens(result);
+  const summaryItems = getResultSummaryItems(result);
   const detailsId = `result-details-${result.id}`;
   const timelineMetadata = [
     { label: "Cycle Year", value: result.cycleYear },
@@ -328,9 +367,9 @@ export function ResultCard({
             <ModerationChip reviewState={result.reviewState} reason={result.moderationReason} />
             {result.hidden ? <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 700 }}>HIDDEN</span> : null}
           </div>
-          <div style={{ display: "flex", gap: 16, fontSize: 12, color: THEME.textMuted, flexWrap: "wrap" }}>
-            {summaryTokens.map((token) => (
-              <span key={token}>{token}</span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {summaryItems.map((item) => (
+              <SummaryChip key={`${result.id}-${item.key}-${item.label}`} item={item} />
             ))}
           </div>
           {(result.university || result.program) && (

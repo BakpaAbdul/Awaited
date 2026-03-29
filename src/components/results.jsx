@@ -12,11 +12,13 @@ export function StatusBadge({ status }) {
         display: "inline-flex",
         alignItems: "center",
         gap: 6,
-        padding: "5px 12px",
+        justifyContent: "center",
+        minWidth: 122,
+        padding: "7px 16px",
         borderRadius: 999,
         background: `${STATUS_CONFIG[status].color}18`,
         color: STATUS_CONFIG[status].color,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 800,
       }}
     >

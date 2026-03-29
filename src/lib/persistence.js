@@ -1,4 +1,8 @@
 import {
+  buildExcerpt,
+  contentToSlug,
+} from "./content";
+import {
   getCanonicalScholarshipName,
   isDatabaseScholarship,
   sortScholarshipNames,
@@ -34,8 +38,68 @@ function normalizeResults(results = []) {
     }));
 }
 
+function normalizeBlogPosts(posts = []) {
+  return posts
+    .filter((post) => post && typeof post.title === "string")
+    .map((post, index) => {
+      const title = post.title.trim();
+      const content = typeof post.content === "string" ? post.content.replace(/\r\n/g, "\n").trim() : "";
+      const slug = (post.slug || contentToSlug(title) || `post-${index}`).trim();
+
+      return {
+        id: post.id ?? `local-blog-${index}`,
+        slug,
+        title,
+        excerpt: (post.excerpt || buildExcerpt(content)).trim(),
+        content,
+        published: post.published !== false,
+        createdAt: post.createdAt || new Date().toISOString(),
+        updatedAt: post.updatedAt || post.createdAt || new Date().toISOString(),
+        authorEmail: post.authorEmail || "",
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
+function normalizeForumReplies(replies = [], threadId = "thread") {
+  return replies
+    .filter((reply) => reply && typeof reply.body === "string")
+    .map((reply, index) => ({
+      id: reply.id ?? `local-forum-reply-${threadId}-${index}`,
+      body: reply.body.replace(/\r\n/g, "\n").trim(),
+      createdAt: reply.createdAt || new Date().toISOString(),
+      reviewState: reply.reviewState || "approved",
+      moderationReason: reply.moderationReason || "",
+    }))
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+}
+
+function normalizeForumThreads(threads = []) {
+  return threads
+    .filter((thread) => thread && typeof thread.title === "string")
+    .map((thread, index) => {
+      const title = thread.title.trim();
+      const body = typeof thread.body === "string" ? thread.body.replace(/\r\n/g, "\n").trim() : "";
+
+      return {
+        id: thread.id ?? `local-forum-thread-${index}`,
+        slug: (thread.slug || contentToSlug(title) || `thread-${index}`).trim(),
+        title,
+        body,
+        locked: Boolean(thread.locked),
+        reviewState: thread.reviewState || "approved",
+        moderationReason: thread.moderationReason || "",
+        createdAt: thread.createdAt || new Date().toISOString(),
+        replies: normalizeForumReplies(thread.replies, thread.id ?? `local-forum-thread-${index}`),
+      };
+    })
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
 export function normalizeAppData(appData = {}) {
   const results = normalizeResults(Array.isArray(appData.results) ? appData.results : []);
+  const blogPosts = normalizeBlogPosts(Array.isArray(appData.blogPosts) ? appData.blogPosts : []);
+  const forumThreads = normalizeForumThreads(Array.isArray(appData.forumThreads) ? appData.forumThreads : []);
   const manualVerified = sortScholarshipNames(
     (Array.isArray(appData.verifiedList) ? appData.verifiedList : [])
       .map((name) => getCanonicalScholarshipName(name))
@@ -48,6 +112,8 @@ export function normalizeAppData(appData = {}) {
 
   return {
     results,
+    blogPosts,
+    forumThreads,
     verifiedList: manualVerified,
     customScholarships: customScholarships.filter((name) => !manualVerified.includes(name)),
   };

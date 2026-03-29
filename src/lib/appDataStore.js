@@ -1,7 +1,8 @@
 import { getDefaultAppData, loadPersistedAppData, normalizeAppData, persistAppData } from "./persistence";
 import { supabase, isSupabaseConfigured } from "./supabaseClient";
 import { getClientFingerprint } from "./clientIdentity";
-import { sanitizeComment, sanitizeScholarshipName, sanitizeSubmission } from "./contentPolicy";
+import { buildExcerpt, contentToSlug } from "./content";
+import { sanitizeBlogPost, sanitizeComment, sanitizeForumReply, sanitizeForumThread, sanitizeScholarshipName, sanitizeSubmission } from "./contentPolicy";
 import {
   findMatchingScholarshipName,
   getCanonicalScholarshipName,
@@ -12,6 +13,9 @@ import {
 const RESULTS_TABLE = "scholarship_results";
 const COMMENTS_TABLE = "scholarship_comments";
 const VERIFIED_TABLE = "verified_scholarships";
+const BLOG_TABLE = "blog_posts";
+const FORUM_THREADS_TABLE = "forum_threads";
+const FORUM_REPLIES_TABLE = "forum_replies";
 const ADMIN_RPC = "current_user_is_admin";
 const ADMIN_FUNCTION = import.meta.env.VITE_SUPABASE_ADMIN_FUNCTION || "admin-actions";
 const PUBLIC_FUNCTION = import.meta.env.VITE_SUPABASE_PUBLIC_FUNCTION || "public-actions";
@@ -65,7 +69,52 @@ function mapResultRow(row, comments = []) {
   };
 }
 
-function buildAppDataFromRows(resultRows = [], commentRows = [], verifiedRows = []) {
+function mapBlogPostRow(row) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    excerpt: row.excerpt || buildExcerpt(row.content || ""),
+    content: row.content || "",
+    published: Boolean(row.published),
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || row.created_at || new Date().toISOString(),
+    authorEmail: row.author_email || "",
+  };
+}
+
+function mapForumReplyRow(row) {
+  return {
+    id: row.id,
+    body: row.body,
+    createdAt: row.created_at || new Date().toISOString(),
+    reviewState: row.review_state || "approved",
+    moderationReason: row.moderation_reason || "",
+  };
+}
+
+function mapForumThreadRow(row, replies = []) {
+  return {
+    id: row.id,
+    slug: row.slug,
+    title: row.title,
+    body: row.body,
+    locked: Boolean(row.locked),
+    reviewState: row.review_state || "approved",
+    moderationReason: row.moderation_reason || "",
+    createdAt: row.created_at || new Date().toISOString(),
+    replies,
+  };
+}
+
+function buildAppDataFromRows(
+  resultRows = [],
+  commentRows = [],
+  verifiedRows = [],
+  blogRows = [],
+  forumThreadRows = [],
+  forumReplyRows = [],
+) {
   const commentsByResult = new Map();
   (commentRows || []).forEach((row) => {
     const comments = commentsByResult.get(row.result_id) || [];
@@ -73,8 +122,17 @@ function buildAppDataFromRows(resultRows = [], commentRows = [], verifiedRows = 
     commentsByResult.set(row.result_id, comments);
   });
 
+  const repliesByThread = new Map();
+  (forumReplyRows || []).forEach((row) => {
+    const replies = repliesByThread.get(row.thread_id) || [];
+    replies.push(mapForumReplyRow(row));
+    repliesByThread.set(row.thread_id, replies);
+  });
+
   return normalizeAppData({
     results: (resultRows || []).map((row) => mapResultRow(row, commentsByResult.get(row.id) || [])),
+    blogPosts: (blogRows || []).map(mapBlogPostRow),
+    forumThreads: (forumThreadRows || []).map((row) => mapForumThreadRow(row, repliesByThread.get(row.id) || [])),
     verifiedList: (verifiedRows || [])
       .filter((row) => (row.source || "manual") === "manual")
       .map((row) => row.name),
@@ -126,24 +184,43 @@ async function invokeFunction(functionName, body, { withAuth = false } = {}) {
 async function loadSupabaseAppData({ admin = false } = {}) {
   const resultsQuery = supabase.from(RESULTS_TABLE).select("*").order("created_at", { ascending: false });
   const commentsQuery = supabase.from(COMMENTS_TABLE).select("*").order("created_at", { ascending: true });
+  const blogQuery = supabase.from(BLOG_TABLE).select("*").order("created_at", { ascending: false });
+  const forumThreadsQuery = supabase.from(FORUM_THREADS_TABLE).select("*").order("created_at", { ascending: false });
+  const forumRepliesQuery = supabase.from(FORUM_REPLIES_TABLE).select("*").order("created_at", { ascending: true });
 
   if (!admin) {
     resultsQuery.eq("review_state", "approved").eq("hidden", false);
     commentsQuery.eq("review_state", "approved");
+    blogQuery.eq("published", true);
+    forumThreadsQuery.eq("review_state", "approved");
+    forumRepliesQuery.eq("review_state", "approved");
   }
 
-  const [{ data: resultRows, error: resultsError }, { data: commentRows, error: commentsError }, { data: verifiedRows, error: verifiedError }] =
+  const [
+    { data: resultRows, error: resultsError },
+    { data: commentRows, error: commentsError },
+    { data: verifiedRows, error: verifiedError },
+    { data: blogRows, error: blogError },
+    { data: forumThreadRows, error: forumThreadsError },
+    { data: forumReplyRows, error: forumRepliesError },
+  ] =
     await Promise.all([
       resultsQuery,
       commentsQuery,
       supabase.from(VERIFIED_TABLE).select("name, source").order("name", { ascending: true }),
+      blogQuery,
+      forumThreadsQuery,
+      forumRepliesQuery,
     ]);
 
   if (resultsError) throw resultsError;
   if (commentsError) throw commentsError;
   if (verifiedError) throw verifiedError;
+  if (blogError) throw blogError;
+  if (forumThreadsError) throw forumThreadsError;
+  if (forumRepliesError) throw forumRepliesError;
 
-  return buildAppDataFromRows(resultRows, commentRows, verifiedRows);
+  return buildAppDataFromRows(resultRows, commentRows, verifiedRows, blogRows, forumThreadRows, forumReplyRows);
 }
 
 function formatFallbackMessage(error) {
@@ -183,6 +260,19 @@ async function loadAppData({ admin = false } = {}) {
     console.error("Falling back to browser-local data because Supabase load failed.", error);
     return loadPersistedAppData();
   }
+}
+
+function getUniqueLocalSlug(items = [], rawTitle, fallbackPrefix) {
+  const baseSlug = contentToSlug(rawTitle) || `${fallbackPrefix}-${Date.now()}`;
+  let nextSlug = baseSlug;
+  let suffix = 2;
+
+  while (items.some((item) => item.slug === nextSlug)) {
+    nextSlug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+
+  return nextSlug;
 }
 
 async function hydrateAppData() {
@@ -389,9 +479,168 @@ async function addComment(resultId, text, moderation = {}, options = {}) {
   };
 }
 
+async function createForumThread(entry, moderation = {}, options = {}) {
+  const sanitizedEntry = sanitizeForumThread(entry);
+
+  if (!isSupabaseConfigured) {
+    const nextData = withLocalMutation((current) => {
+      const slug = getUniqueLocalSlug(current.forumThreads || [], sanitizedEntry.title, "thread");
+
+      return {
+        ...current,
+        forumThreads: [
+          {
+            id: `local-forum-thread-${Date.now()}`,
+            slug,
+            title: sanitizedEntry.title,
+            body: sanitizedEntry.body,
+            locked: false,
+            reviewState: "approved",
+            moderationReason: "",
+            createdAt: new Date().toISOString(),
+            replies: [],
+          },
+          ...(current.forumThreads || []),
+        ],
+      };
+    });
+
+    return {
+      appData: nextData,
+      meta: { reviewState: "approved", slug: nextData.forumThreads[0]?.slug || "" },
+    };
+  }
+
+  const response = await invokeFunction(
+    PUBLIC_FUNCTION,
+    {
+      action: "createForumThread",
+      entry: sanitizedEntry,
+      meta: {
+        fingerprint: getClientFingerprint(),
+        honeypot: moderation.honeypot || "",
+        captchaToken: moderation.captchaToken || "",
+      },
+    },
+    { withAuth: false },
+  );
+
+  return {
+    appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
+    meta: {
+      reviewState: response?.reviewState || "approved",
+      moderationReason: response?.moderationReason || "",
+      slug: response?.slug || "",
+    },
+  };
+}
+
+async function addForumReply(threadId, text, moderation = {}, options = {}) {
+  const sanitizedText = sanitizeForumReply(text);
+
+  if (!isSupabaseConfigured) {
+    const nextData = withLocalMutation((current) => ({
+      ...current,
+      forumThreads: (current.forumThreads || []).map((thread) =>
+        thread.id === threadId
+          ? {
+              ...thread,
+              replies: [
+                ...(thread.replies || []),
+                {
+                  id: `local-forum-reply-${threadId}-${Date.now()}`,
+                  body: sanitizedText,
+                  createdAt: new Date().toISOString(),
+                  reviewState: "approved",
+                  moderationReason: "",
+                },
+              ],
+            }
+          : thread,
+      ),
+    }));
+
+    return {
+      appData: nextData,
+      meta: { reviewState: "approved" },
+    };
+  }
+
+  const response = await invokeFunction(
+    PUBLIC_FUNCTION,
+    {
+      action: "addForumReply",
+      threadId,
+      text: sanitizedText,
+      meta: {
+        fingerprint: getClientFingerprint(),
+        honeypot: moderation.honeypot || "",
+        captchaToken: moderation.captchaToken || "",
+      },
+    },
+    { withAuth: false },
+  );
+
+  return {
+    appData: options.admin ? await loadAdminAppData() : await loadPublicAppData(),
+    meta: {
+      reviewState: response?.reviewState || "approved",
+      moderationReason: response?.moderationReason || "",
+    },
+  };
+}
+
 async function invokeAdminMutation(action, payload = {}) {
   await invokeFunction(ADMIN_FUNCTION, { action, ...payload }, { withAuth: true });
   return loadAdminAppData();
+}
+
+async function saveBlogPost(entry) {
+  const sanitizedEntry = sanitizeBlogPost(entry);
+
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => {
+      const now = new Date().toISOString();
+      const existingPosts = current.blogPosts || [];
+      const existing = existingPosts.find((post) => post.id === entry.id);
+      const desiredSlug = existing?.slug || getUniqueLocalSlug(existingPosts, sanitizedEntry.title, "post");
+      const nextPost = {
+        id: entry.id || `local-blog-${Date.now()}`,
+        slug: desiredSlug,
+        title: sanitizedEntry.title,
+        excerpt: sanitizedEntry.excerpt || buildExcerpt(sanitizedEntry.content),
+        content: sanitizedEntry.content,
+        published: entry.published !== false,
+        createdAt: existing?.createdAt || now,
+        updatedAt: now,
+        authorEmail: existing?.authorEmail || "local-admin@awaited.local",
+      };
+
+      return {
+        ...current,
+        blogPosts: [nextPost, ...existingPosts.filter((post) => post.id !== nextPost.id)],
+      };
+    });
+  }
+
+  return invokeAdminMutation("upsertBlogPost", {
+    postId: entry.id || null,
+    title: sanitizedEntry.title,
+    excerpt: sanitizedEntry.excerpt,
+    content: sanitizedEntry.content,
+    published: entry.published !== false,
+  });
+}
+
+async function deleteBlogPost(postId) {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      blogPosts: (current.blogPosts || []).filter((post) => post.id !== postId),
+    }));
+  }
+
+  return invokeAdminMutation("deleteBlogPost", { postId });
 }
 
 async function setResultHidden(resultId, hidden) {
@@ -430,6 +679,31 @@ async function deleteComment(commentId) {
   return invokeAdminMutation("deleteComment", { commentId });
 }
 
+async function deleteForumThread(threadId) {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      forumThreads: (current.forumThreads || []).filter((thread) => thread.id !== threadId),
+    }));
+  }
+
+  return invokeAdminMutation("deleteForumThread", { threadId });
+}
+
+async function deleteForumReply(replyId) {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      forumThreads: (current.forumThreads || []).map((thread) => ({
+        ...thread,
+        replies: (thread.replies || []).filter((reply) => reply.id !== replyId),
+      })),
+    }));
+  }
+
+  return invokeAdminMutation("deleteForumReply", { replyId });
+}
+
 async function setResultReviewState(resultId, reviewState, moderationReason = "") {
   if (!isSupabaseConfigured) {
     return withLocalMutation((current) => ({
@@ -457,6 +731,48 @@ async function setCommentReviewState(commentId, reviewState, moderationReason = 
   }
 
   return invokeAdminMutation("setCommentReviewState", { commentId, reviewState, moderationReason });
+}
+
+async function setForumThreadReviewState(threadId, reviewState, moderationReason = "") {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      forumThreads: (current.forumThreads || []).map((thread) =>
+        thread.id === threadId ? { ...thread, reviewState, moderationReason } : thread,
+      ),
+    }));
+  }
+
+  return invokeAdminMutation("setForumThreadReviewState", { threadId, reviewState, moderationReason });
+}
+
+async function setForumReplyReviewState(replyId, reviewState, moderationReason = "") {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      forumThreads: (current.forumThreads || []).map((thread) => ({
+        ...thread,
+        replies: (thread.replies || []).map((reply) =>
+          reply.id === replyId ? { ...reply, reviewState, moderationReason } : reply,
+        ),
+      })),
+    }));
+  }
+
+  return invokeAdminMutation("setForumReplyReviewState", { replyId, reviewState, moderationReason });
+}
+
+async function setForumThreadLocked(threadId, locked) {
+  if (!isSupabaseConfigured) {
+    return withLocalMutation((current) => ({
+      ...current,
+      forumThreads: (current.forumThreads || []).map((thread) =>
+        thread.id === threadId ? { ...thread, locked } : thread,
+      ),
+    }));
+  }
+
+  return invokeAdminMutation("setForumThreadLocked", { threadId, locked });
 }
 
 async function addVerifiedScholarship(name) {
@@ -519,6 +835,9 @@ function subscribeToAppData({ admin = false } = {}, onData, onError) {
     .on("postgres_changes", { event: "*", schema: "public", table: RESULTS_TABLE }, scheduleReload)
     .on("postgres_changes", { event: "*", schema: "public", table: COMMENTS_TABLE }, scheduleReload)
     .on("postgres_changes", { event: "*", schema: "public", table: VERIFIED_TABLE }, scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: BLOG_TABLE }, scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: FORUM_THREADS_TABLE }, scheduleReload)
+    .on("postgres_changes", { event: "*", schema: "public", table: FORUM_REPLIES_TABLE }, scheduleReload)
     .subscribe((status) => {
       if (status === "SUBSCRIBED") {
         scheduleReload();
@@ -545,7 +864,7 @@ export const appDataStore = {
   getDefaultAppData,
   getInitialAppData() {
     return DATA_BACKEND_MODE === "supabase"
-      ? normalizeAppData({ results: [], verifiedList: [], customScholarships: [] })
+      ? normalizeAppData({ results: [], blogPosts: [], forumThreads: [], verifiedList: [], customScholarships: [] })
       : loadPersistedAppData();
   },
   hydrateAppData,
@@ -558,11 +877,20 @@ export const appDataStore = {
   subscribeToAppData,
   submitResult,
   addComment,
+  createForumThread,
+  addForumReply,
+  saveBlogPost,
+  deleteBlogPost,
   setResultHidden,
   deleteResult,
   deleteComment,
+  deleteForumThread,
+  deleteForumReply,
   setResultReviewState,
   setCommentReviewState,
+  setForumThreadReviewState,
+  setForumReplyReviewState,
+  setForumThreadLocked,
   addVerifiedScholarship,
   removeVerifiedScholarship,
 };

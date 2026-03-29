@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AdminBlogPanel, BlogIndex, BlogPostView, ForumIndex, ForumThreadView } from "./components/communitySections";
 import { LEVELS, STATUSES, STATUS_CONFIG } from "./lib/constants";
 import { appDataStore, DATA_BACKEND_MODE } from "./lib/appDataStore";
 import { parseAppRoute, pushAppRoute } from "./lib/router";
@@ -20,7 +21,7 @@ import {
 const INITIAL_ROUTE =
   typeof window !== "undefined"
     ? parseAppRoute(window.location.pathname)
-    : { view: "feed", scholarshipSlug: null };
+    : { view: "feed", scholarshipSlug: null, blogSlug: null, forumSlug: null };
 const ADMIN_ENTRY_STORAGE_KEY = "awaited:admin-entry:v1";
 
 const TRUST_PAGES = {
@@ -163,6 +164,8 @@ export default function AwaitedApp() {
   const [syncError, setSyncError] = useState("");
   const [view, setView] = useState(INITIAL_ROUTE.view);
   const [routeScholarshipSlug, setRouteScholarshipSlug] = useState(INITIAL_ROUTE.scholarshipSlug);
+  const [routeBlogSlug, setRouteBlogSlug] = useState(INITIAL_ROUTE.blogSlug);
+  const [routeForumSlug, setRouteForumSlug] = useState(INITIAL_ROUTE.forumSlug);
   const [selectedScholarship, setSelectedScholarship] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("All");
@@ -183,6 +186,8 @@ export default function AwaitedApp() {
   const isAdmin = Boolean(adminUser);
   const canAccessAdminEntry = isAdmin || adminEntryUnlocked;
   const results = appData.results;
+  const blogPosts = appData.blogPosts || [];
+  const forumThreads = appData.forumThreads || [];
   const manualVerifiedList = appData.verifiedList;
   const customScholarships = appData.customScholarships || [];
   const verifiedList = useMemo(
@@ -252,6 +257,8 @@ export default function AwaitedApp() {
       const nextRoute = parseAppRoute(window.location.pathname);
       setView(nextRoute.view);
       setRouteScholarshipSlug(nextRoute.scholarshipSlug);
+      setRouteBlogSlug(nextRoute.blogSlug);
+      setRouteForumSlug(nextRoute.forumSlug);
       if (nextRoute.view !== "scholarship") {
         setSelectedScholarship(null);
       }
@@ -296,6 +303,28 @@ export default function AwaitedApp() {
       return;
     }
 
+    if (view === "blog") {
+      document.title = "Awaited — Blog";
+      return;
+    }
+
+    if (view === "blogPost") {
+      const post = blogPosts.find((item) => item.slug === routeBlogSlug);
+      document.title = post ? `Awaited — ${post.title}` : "Awaited — Blog";
+      return;
+    }
+
+    if (view === "forum") {
+      document.title = "Awaited — Forum";
+      return;
+    }
+
+    if (view === "forumThread") {
+      const thread = forumThreads.find((item) => item.slug === routeForumSlug);
+      document.title = thread ? `Awaited — ${thread.title}` : "Awaited — Forum";
+      return;
+    }
+
     if (view === "admin" || view === "login") {
       document.title = "Awaited — Admin";
       return;
@@ -307,7 +336,7 @@ export default function AwaitedApp() {
     }
 
     document.title = "Awaited — Scholarship Results Tracker";
-  }, [view, selectedScholarship]);
+  }, [view, selectedScholarship, blogPosts, routeBlogSlug, forumThreads, routeForumSlug]);
 
   const showFlash = (message) => {
     setFlashMessage(message);
@@ -348,12 +377,24 @@ export default function AwaitedApp() {
     }
   };
 
-  const applyRoute = (nextView, { scholarshipName = null } = {}) => {
+  const applyRoute = (nextView, { scholarshipName = null, blogSlug = null, forumSlug = null } = {}) => {
     let pathname = "/";
     let nextSlug = null;
+    let nextBlogSlug = null;
+    let nextForumSlug = null;
 
     if (nextView === "submit") {
       pathname = "/submit";
+    } else if (nextView === "blog") {
+      pathname = "/blog";
+    } else if (nextView === "blogPost" && blogSlug) {
+      nextBlogSlug = blogSlug;
+      pathname = `/blog/${encodeURIComponent(nextBlogSlug)}`;
+    } else if (nextView === "forum") {
+      pathname = "/forum";
+    } else if (nextView === "forumThread" && forumSlug) {
+      nextForumSlug = forumSlug;
+      pathname = `/forum/${encodeURIComponent(nextForumSlug)}`;
     } else if (nextView === "privacy") {
       pathname = "/privacy";
     } else if (nextView === "community") {
@@ -371,6 +412,8 @@ export default function AwaitedApp() {
 
     setView(nextView);
     setRouteScholarshipSlug(nextSlug);
+    setRouteBlogSlug(nextBlogSlug);
+    setRouteForumSlug(nextForumSlug);
     if (nextView === "scholarship") {
       setSelectedScholarship(scholarshipName);
     } else {
@@ -499,6 +542,26 @@ export default function AwaitedApp() {
     };
   }, [isAdmin, results, selectedScholarship, visibleResults]);
 
+  const visibleBlogPosts = useMemo(
+    () => blogPosts.filter((post) => isAdmin || post.published),
+    [blogPosts, isAdmin],
+  );
+
+  const selectedBlogPost = useMemo(
+    () => visibleBlogPosts.find((post) => post.slug === routeBlogSlug) || null,
+    [visibleBlogPosts, routeBlogSlug],
+  );
+
+  const visibleForumThreads = useMemo(
+    () => forumThreads.filter((thread) => isAdmin || thread.reviewState === "approved"),
+    [forumThreads, isAdmin],
+  );
+
+  const selectedForumThread = useMemo(
+    () => visibleForumThreads.find((thread) => thread.slug === routeForumSlug) || null,
+    [visibleForumThreads, routeForumSlug],
+  );
+
   const pendingResults = useMemo(
     () => results.filter((result) => result.reviewState === "pending"),
     [results],
@@ -515,6 +578,24 @@ export default function AwaitedApp() {
       )
       .filter((comment) => comment.reviewState === "pending");
   }, [results]);
+
+  const pendingForumThreads = useMemo(
+    () => forumThreads.filter((thread) => thread.reviewState === "pending"),
+    [forumThreads],
+  );
+
+  const pendingForumReplies = useMemo(() => {
+    return forumThreads
+      .flatMap((thread) =>
+        thread.replies.map((reply) => ({
+          ...reply,
+          threadId: thread.id,
+          threadTitle: thread.title,
+          threadLocked: thread.locked,
+        })),
+      )
+      .filter((reply) => reply.reviewState === "pending");
+  }, [forumThreads]);
 
   const handleSubmit = async (entry, moderation) => {
     await applyStoreMutation(
@@ -550,6 +631,51 @@ export default function AwaitedApp() {
         },
       },
     );
+  };
+
+  const handleCreateForumThread = async (entry, moderation) => {
+    const result = await applyStoreMutation(
+      () => appDataStore.createForumThread(entry, moderation, { admin: isAdmin }),
+      {
+        onSuccess: (_, meta) => {
+          if (meta.reviewState === "pending") {
+            showFlash("Forum thread received and queued for moderation.");
+            applyRoute("forum");
+            return;
+          }
+
+          showFlash("Forum thread posted.");
+          if (meta.slug) {
+            applyRoute("forumThread", { forumSlug: meta.slug });
+          } else {
+            applyRoute("forum");
+          }
+        },
+      },
+    );
+
+    return Boolean(result);
+  };
+
+  const handleAddForumReply = async (threadId, text, moderation) => {
+    if (!text.trim()) {
+      return false;
+    }
+
+    const result = await applyStoreMutation(
+      () => appDataStore.addForumReply(threadId, text.trim(), moderation, { admin: isAdmin }),
+      {
+        onSuccess: (_, meta) => {
+          showFlash(
+            meta.reviewState === "pending"
+              ? "Reply received and queued for moderation."
+              : "Reply posted.",
+          );
+        },
+      },
+    );
+
+    return Boolean(result);
   };
 
   const handleAdminLogin = async () => {
@@ -602,6 +728,30 @@ export default function AwaitedApp() {
     });
   };
 
+  const handleSaveBlogPost = async (entry) => {
+    const result = await applyStoreMutation(
+      () => appDataStore.saveBlogPost(entry),
+      {
+        onSuccess: (nextData) => {
+          const updatedPosts = nextData?.blogPosts || [];
+          const latestPost = updatedPosts.find((post) => post.title === entry.title) || updatedPosts[0];
+          showFlash(entry.id ? "Blog post updated." : "Blog post saved.");
+          if (latestPost?.slug) {
+            applyRoute("blogPost", { blogSlug: latestPost.slug });
+          }
+        },
+      },
+    );
+
+    return Boolean(result);
+  };
+
+  const handleDeleteBlogPost = async (postId) => {
+    await applyStoreMutation(() => appDataStore.deleteBlogPost(postId), {
+      onSuccess: () => showFlash("Blog post deleted."),
+    });
+  };
+
   const requestedView = view === "admin" && !isAdmin ? "login" : view;
   const resolvedView =
     !canAccessAdminEntry && (requestedView === "login" || requestedView === "admin")
@@ -631,6 +781,8 @@ export default function AwaitedApp() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <NavBtn active={resolvedView === "feed"} onClick={() => applyRoute("feed")}>Browse</NavBtn>
+          <NavBtn active={resolvedView === "blog" || resolvedView === "blogPost"} onClick={() => applyRoute("blog")}>Blog</NavBtn>
+          <NavBtn active={resolvedView === "forum" || resolvedView === "forumThread"} onClick={() => applyRoute("forum")}>Forum</NavBtn>
           <NavBtn active={resolvedView === "submit"} onClick={() => applyRoute("submit")} accent>+ Submit</NavBtn>
           {isAdmin ? (
             <>
@@ -727,13 +879,13 @@ export default function AwaitedApp() {
               <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, margin: 0 }}>Admin Panel</h2>
             </div>
 
-            <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 4, border: "1px solid rgba(255,255,255,0.06)" }}>
-              {[["moderation", "🛡 Moderation"], ["analytics", "📊 Analytics"], ["scholarships", "🎓 Scholarships"]].map(([key, label]) => (
+            <div style={{ display: "flex", gap: 4, marginBottom: 24, background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 4, border: "1px solid rgba(255,255,255,0.06)", flexWrap: "wrap" }}>
+              {[["moderation", "🛡 Moderation"], ["analytics", "📊 Analytics"], ["scholarships", "🎓 Scholarships"], ["blog", "📝 Blog"]].map(([key, label]) => (
                 <button
                   key={key}
                   onClick={() => setAdminTab(key)}
                   style={{
-                    flex: 1,
+                    flex: "1 1 180px",
                     padding: "10px 16px",
                     borderRadius: 10,
                     border: "none",
@@ -754,6 +906,8 @@ export default function AwaitedApp() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
                   <AnalyticsCard label="Pending Results" value={pendingResults.length} color="#F59E0B" />
                   <AnalyticsCard label="Pending Comments" value={pendingComments.length} color="#F59E0B" />
+                  <AnalyticsCard label="Pending Threads" value={pendingForumThreads.length} color="#F59E0B" />
+                  <AnalyticsCard label="Pending Replies" value={pendingForumReplies.length} color="#F59E0B" />
                   <AnalyticsCard label="Rejected Results" value={results.filter((result) => result.reviewState === "rejected").length} color="#EF4444" />
                   <AnalyticsCard label="Hidden Results" value={results.filter((result) => result.hidden).length} color="#DC2626" />
                 </div>
@@ -794,6 +948,52 @@ export default function AwaitedApp() {
                             <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setCommentReviewState(comment.id, "approved"))} color="#059669">Approve</AdminBtn>
                             <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setCommentReviewState(comment.id, "rejected", "Rejected during moderation"))} color="#D97706">Reject</AdminBtn>
                             <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.deleteComment(comment.id))} color="#DC2626">Delete</AdminBtn>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {pendingForumThreads.length > 0 && (
+                  <div style={panelStyle}>
+                    <h3 style={panelTitle}>Queue: Pending Forum Threads</h3>
+                    {pendingForumThreads.map((thread) => (
+                      <div key={`pending-thread-${thread.id}`} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)", marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: "#E2E8F0", marginBottom: 4 }}>{thread.title}</div>
+                            <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{new Date(thread.createdAt).toLocaleString()}</div>
+                            <div style={{ fontSize: 13, color: "#CBD5E1", marginBottom: 6, whiteSpace: "pre-wrap" }}>{thread.body}</div>
+                            {thread.moderationReason && <ModerationChip reviewState="pending" reason={thread.moderationReason} />}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setForumThreadReviewState(thread.id, "approved"))} color="#059669">Approve</AdminBtn>
+                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setForumThreadReviewState(thread.id, "rejected", "Rejected during moderation"))} color="#D97706">Reject</AdminBtn>
+                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.deleteForumThread(thread.id))} color="#DC2626">Delete</AdminBtn>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {pendingForumReplies.length > 0 && (
+                  <div style={panelStyle}>
+                    <h3 style={panelTitle}>Queue: Pending Forum Replies</h3>
+                    {pendingForumReplies.map((reply) => (
+                      <div key={`pending-forum-reply-${reply.id}`} style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.12)", marginBottom: 8 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "#E2E8F0", marginBottom: 4 }}>{reply.threadTitle}</div>
+                            <div style={{ fontSize: 12, color: "#64748B", marginBottom: 6 }}>{new Date(reply.createdAt).toLocaleString()}</div>
+                            <div style={{ fontSize: 13, color: "#CBD5E1", marginBottom: 6, whiteSpace: "pre-wrap" }}>{reply.body}</div>
+                            {reply.moderationReason && <ModerationChip reviewState="pending" reason={reply.moderationReason} />}
+                          </div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setForumReplyReviewState(reply.id, "approved"))} color="#059669">Approve</AdminBtn>
+                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.setForumReplyReviewState(reply.id, "rejected", "Rejected during moderation"))} color="#D97706">Reject</AdminBtn>
+                            <AdminBtn onClick={() => applyStoreMutation(() => appDataStore.deleteForumReply(reply.id))} color="#DC2626">Delete</AdminBtn>
                           </div>
                         </div>
                       </div>
@@ -934,6 +1134,15 @@ export default function AwaitedApp() {
                 </div>
               </div>
             )}
+
+            {adminTab === "blog" && (
+              <AdminBlogPanel
+                posts={blogPosts}
+                onSavePost={handleSaveBlogPost}
+                onDeletePost={handleDeleteBlogPost}
+                onOpenPost={(slug) => applyRoute("blogPost", { blogSlug: slug })}
+              />
+            )}
           </div>
         )}
 
@@ -1003,6 +1212,58 @@ export default function AwaitedApp() {
             )}
             <div style={{ textAlign: "center", marginTop: 32, color: "#475569", fontSize: 13 }}>Showing {filtered.length} of {visibleResults.length} results</div>
           </>
+        )}
+
+        {resolvedView === "blog" && (
+          <BlogIndex
+            posts={visibleBlogPosts}
+            onOpenPost={(slug) => applyRoute("blogPost", { blogSlug: slug })}
+          />
+        )}
+
+        {resolvedView === "blogPost" && selectedBlogPost && (
+          <BlogPostView
+            post={selectedBlogPost}
+            onBack={() => applyRoute("blog")}
+          />
+        )}
+
+        {resolvedView === "blogPost" && !selectedBlogPost && (
+          <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
+            <h3 style={{ ...panelTitle, marginBottom: 8 }}>Blog Post Not Found</h3>
+            <p style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>
+              That post either does not exist or is not published for the public site.
+            </p>
+            <button onClick={() => applyRoute("blog")} style={{ ...primaryButtonStyle, width: "auto", padding: "10px 18px" }}>Back to blog</button>
+          </div>
+        )}
+
+        {resolvedView === "forum" && (
+          <ForumIndex
+            threads={visibleForumThreads}
+            isAdmin={isAdmin}
+            onOpenThread={(slug) => applyRoute("forumThread", { forumSlug: slug })}
+            onCreateThread={handleCreateForumThread}
+          />
+        )}
+
+        {resolvedView === "forumThread" && selectedForumThread && (
+          <ForumThreadView
+            thread={selectedForumThread}
+            isAdmin={isAdmin}
+            onBack={() => applyRoute("forum")}
+            onReplySubmit={handleAddForumReply}
+          />
+        )}
+
+        {resolvedView === "forumThread" && !selectedForumThread && (
+          <div style={{ ...panelStyle, textAlign: "center", padding: 40 }}>
+            <h3 style={{ ...panelTitle, marginBottom: 8 }}>Discussion Not Found</h3>
+            <p style={{ color: "#64748B", fontSize: 13, marginBottom: 12 }}>
+              That thread either does not exist or is still waiting for moderation.
+            </p>
+            <button onClick={() => applyRoute("forum")} style={{ ...primaryButtonStyle, width: "auto", padding: "10px 18px" }}>Back to forum</button>
+          </div>
         )}
 
         {resolvedView === "submit" && (

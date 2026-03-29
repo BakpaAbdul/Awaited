@@ -28,6 +28,45 @@ function cleanText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeSlugText(value: string) {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/&/g, " and ")
+    .replace(/[^a-zA-Z0-9]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function contentToSlug(value: string) {
+  return normalizeSlugText(value).replace(/\s+/g, "-");
+}
+
+async function ensureUniqueSlug(table: string, title: string, excludeId?: number) {
+  const baseSlug = contentToSlug(title) || `${table}-${Date.now()}`;
+  let nextSlug = baseSlug;
+  let suffix = 2;
+
+  while (true) {
+    const query = adminClient.from(table).select("id").eq("slug", nextSlug);
+    if (excludeId) {
+      query.neq("id", excludeId);
+    }
+
+    const { data, error } = await query.maybeSingle();
+    if (error) {
+      throw error;
+    }
+
+    if (!data?.id) {
+      return nextSlug;
+    }
+
+    nextSlug = `${baseSlug}-${suffix}`;
+    suffix += 1;
+  }
+}
+
 async function requireAdmin(request: Request) {
   const authorization = request.headers.get("Authorization");
   if (!authorization) {
@@ -129,6 +168,89 @@ Deno.serve(async (request) => {
 
       case "deleteComment": {
         const { error } = await adminClient.from("scholarship_comments").delete().eq("id", body.commentId);
+        if (error) throw error;
+        break;
+      }
+
+      case "upsertBlogPost": {
+        const postId = Number(body.postId) || null;
+        const title = cleanText(body.title);
+        const excerpt = cleanText(body.excerpt) || null;
+        const content = cleanText(body.content);
+        const published = Boolean(body.published);
+        const slug = await ensureUniqueSlug("blog_posts", title, postId || undefined);
+        const payload = {
+          slug,
+          title,
+          excerpt,
+          content,
+          published,
+          author_email: adminCheck.user?.email || null,
+          updated_at: new Date().toISOString(),
+        };
+
+        const query = postId
+          ? adminClient.from("blog_posts").update(payload).eq("id", postId)
+          : adminClient.from("blog_posts").insert(payload);
+        const { error } = await query;
+        if (error) throw error;
+        break;
+      }
+
+      case "deleteBlogPost": {
+        const { error } = await adminClient.from("blog_posts").delete().eq("id", body.postId);
+        if (error) throw error;
+        break;
+      }
+
+      case "setForumThreadReviewState": {
+        const reviewState = cleanText(body.reviewState);
+        const moderationReason = cleanText(body.moderationReason) || null;
+        const { error } = await adminClient
+          .from("forum_threads")
+          .update({
+            review_state: reviewState,
+            moderation_reason: reviewState === "approved" ? null : moderationReason,
+          })
+          .eq("id", body.threadId);
+
+        if (error) throw error;
+        break;
+      }
+
+      case "setForumReplyReviewState": {
+        const reviewState = cleanText(body.reviewState);
+        const moderationReason = cleanText(body.moderationReason) || null;
+        const { error } = await adminClient
+          .from("forum_replies")
+          .update({
+            review_state: reviewState,
+            moderation_reason: reviewState === "approved" ? null : moderationReason,
+          })
+          .eq("id", body.replyId);
+
+        if (error) throw error;
+        break;
+      }
+
+      case "setForumThreadLocked": {
+        const { error } = await adminClient
+          .from("forum_threads")
+          .update({ locked: Boolean(body.locked) })
+          .eq("id", body.threadId);
+
+        if (error) throw error;
+        break;
+      }
+
+      case "deleteForumThread": {
+        const { error } = await adminClient.from("forum_threads").delete().eq("id", body.threadId);
+        if (error) throw error;
+        break;
+      }
+
+      case "deleteForumReply": {
+        const { error } = await adminClient.from("forum_replies").delete().eq("id", body.replyId);
         if (error) throw error;
         break;
       }

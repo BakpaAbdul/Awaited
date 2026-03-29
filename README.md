@@ -58,6 +58,11 @@ npm run dev
 
 The app will be running at `http://localhost:5173`.
 
+### Persistence
+Awaited now persists submissions, comments, moderation changes, and verified scholarship names in browser local storage by default, so the beta no longer resets on refresh.
+
+This is still local-only persistence. For a public multi-user launch, you should replace it with a shared backend such as Supabase.
+
 ### Admin access
 Click the **Admin** button in the top-right corner and enter the password: `scholar2026`
 

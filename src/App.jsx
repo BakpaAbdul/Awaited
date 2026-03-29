@@ -1,47 +1,23 @@
-import { useState, useMemo, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { LEVELS, STATUSES, STATUS_CONFIG } from "./lib/constants";
+import { loadPersistedAppData, persistAppData, PERSISTENCE_MODE } from "./lib/persistence";
+import {
+  buildScholarshipSuggestions,
+  DATABASE_SCHOLARSHIP_NAMES,
+  findMatchingScholarshipName,
+  getCanonicalScholarshipName,
+  getScholarshipRecord,
+  isDatabaseScholarship,
+  removeScholarshipName,
+  sortScholarshipNames,
+} from "./lib/scholarships";
 
 // ─── Config ──────────────────────────────────────────────────────────────────
-const ADMIN_PASSWORD = "scholar2026"; // Change this!
-
-const STATUS_CONFIG = {
-  Applied: { color: "#6B7280", bg: "#F3F4F6", icon: "○" },
-  Interview: { color: "#D97706", bg: "#FEF3C7", icon: "◎" },
-  Waitlisted: { color: "#7C3AED", bg: "#EDE9FE", icon: "◑" },
-  Accepted: { color: "#059669", bg: "#D1FAE5", icon: "●" },
-  Rejected: { color: "#DC2626", bg: "#FEE2E2", icon: "✕" },
-};
-
-const LEVELS = ["Undergrad", "Masters", "PhD", "Postdoc"];
-const STATUSES = ["Applied", "Interview", "Waitlisted", "Accepted", "Rejected"];
-
-const INITIAL_VERIFIED = [
-  "Chevening Scholarship", "Fulbright", "DAAD EPOS", "Gates Cambridge",
-  "Erasmus Mundus", "Rhodes Scholarship", "Australia Awards", "MEXT Scholarship",
-  "Türkiye Burslari", "Commonwealth Scholarship", "Aga Khan Foundation",
-  "Swedish Institute Scholarship", "Korean Government Scholarship (KGSP)",
-  "Chinese Government Scholarship (CSC)", "New Zealand Scholarships",
-];
-
-const SEED_RESULTS = [
-  { id: 1, scholarship: "Chevening Scholarship", country: "United Kingdom", level: "Masters", field: "Public Policy", status: "Accepted", date: "2026-02-15", nationality: "Nigerian", gpa: "3.7", note: "Interview was about leadership and networking plan. Got the email 3 weeks after interview.", comments: [{ text: "Congrats! How long between application and interview?", time: "2026-02-18" }, { text: "About 2 months for me.", time: "2026-02-19" }], hidden: false, createdAt: "2026-02-15T10:00:00Z" },
-  { id: 2, scholarship: "Chevening Scholarship", country: "United Kingdom", level: "Masters", field: "Economics", status: "Rejected", date: "2026-02-20", nationality: "Ghanaian", gpa: "3.5", note: "No interview invitation. Applied for LSE. Second attempt.", comments: [], hidden: false, createdAt: "2026-02-20T08:00:00Z" },
-  { id: 3, scholarship: "DAAD EPOS", country: "Germany", level: "Masters", field: "Development Economics", status: "Interview", date: "2026-01-10", nationality: "Kenyan", gpa: "3.4", note: "Got interview invite via email. Panel of 3 professors. Very academic questions.", comments: [{ text: "What kind of academic questions?", time: "2026-01-12" }], hidden: false, createdAt: "2026-01-10T14:00:00Z" },
-  { id: 4, scholarship: "Fulbright", country: "United States", level: "PhD", field: "Political Science", status: "Accepted", date: "2025-12-05", nationality: "Colombian", gpa: "3.9", note: "Applied through the Colombian Fulbright commission. Long process — 6 months total.", comments: [], hidden: false, createdAt: "2025-12-05T09:00:00Z" },
-  { id: 5, scholarship: "Fulbright", country: "United States", level: "Masters", field: "Computer Science", status: "Waitlisted", date: "2026-01-20", nationality: "Indonesian", gpa: "3.6", note: "Still waiting. Anyone else in the same boat?", comments: [{ text: "Same here, applied for CS too. Fingers crossed.", time: "2026-01-22" }, { text: "I was waitlisted last year and got in eventually in March.", time: "2026-01-23" }], hidden: false, createdAt: "2026-01-20T11:00:00Z" },
-  { id: 6, scholarship: "Gates Cambridge", country: "United Kingdom", level: "PhD", field: "Neuroscience", status: "Accepted", date: "2026-03-01", nationality: "Indian", gpa: "3.95", note: "The interview was conversational. They care a lot about your 'why Cambridge' answer.", comments: [], hidden: false, createdAt: "2026-03-01T16:00:00Z" },
-  { id: 7, scholarship: "Erasmus Mundus", country: "Europe (Multiple)", level: "Masters", field: "Data Science", status: "Rejected", date: "2026-02-28", nationality: "Pakistani", gpa: "3.3", note: "Second year applying. Didn't make it past the consortium ranking.", comments: [{ text: "Try strengthening the motivation letter — that's where most people lose points.", time: "2026-03-01" }], hidden: false, createdAt: "2026-02-28T12:00:00Z" },
-  { id: 8, scholarship: "Rhodes Scholarship", country: "United Kingdom", level: "Masters", field: "Philosophy", status: "Interview", date: "2026-01-15", nationality: "American", gpa: "3.88", note: "State-level interview done. Waiting for national results.", comments: [], hidden: false, createdAt: "2026-01-15T13:00:00Z" },
-  { id: 9, scholarship: "Australia Awards", country: "Australia", level: "Masters", field: "Environmental Science", status: "Accepted", date: "2025-11-30", nationality: "Vietnamese", gpa: "3.5", note: "Took almost 8 months from application to final result. Worth the wait!", comments: [], hidden: false, createdAt: "2025-11-30T07:00:00Z" },
-  { id: 10, scholarship: "MEXT Scholarship", country: "Japan", level: "PhD", field: "Electrical Engineering", status: "Applied", date: "2026-03-10", nationality: "Bangladeshi", gpa: "3.65", note: "Embassy track. Submitted documents last week. The wait begins.", comments: [{ text: "Embassy track takes forever but it's worth it. Good luck!", time: "2026-03-11" }], hidden: false, createdAt: "2026-03-10T15:00:00Z" },
-  { id: 11, scholarship: "Chevening Scholarship", country: "United Kingdom", level: "Masters", field: "International Relations", status: "Waitlisted", date: "2026-02-22", nationality: "Ethiopian", gpa: "3.6", note: "Waitlisted after interview. Anyone know how likely it is to get off the waitlist?", comments: [{ text: "A friend got off the Chevening waitlist last year in April. Don't lose hope.", time: "2026-02-24" }], hidden: false, createdAt: "2026-02-22T10:00:00Z" },
-  { id: 12, scholarship: "Türkiye Burslari", country: "Turkey", level: "Undergrad", field: "Medicine", status: "Interview", date: "2026-03-05", nationality: "Somali", gpa: "3.8", note: "Online interview scheduled. Anyone have tips for the Turkey scholarship interview?", comments: [], hidden: false, createdAt: "2026-03-05T09:00:00Z" },
-  { id: 13, scholarship: "FREE MONEY NO SCAM", country: "Nowhere", level: "Masters", field: "Spam", status: "Applied", date: "2026-03-20", nationality: "", gpa: "", note: "Visit my website for free scholarship guaranteed!", comments: [], hidden: false, createdAt: "2026-03-20T03:00:00Z" },
-];
+const ADMIN_PASSWORD = import.meta.env.VITE_ADMIN_PASSWORD || "scholar2026";
 
 // ─── Main App ────────────────────────────────────────────────────────────────
 export default function AwaitedApp() {
-  const [results, setResults] = useState(SEED_RESULTS);
-  const [verifiedList, setVerifiedList] = useState(INITIAL_VERIFIED);
+  const [appData, setAppData] = useState(() => loadPersistedAppData());
   const [view, setView] = useState("feed");
   const [selectedScholarship, setSelectedScholarship] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +34,62 @@ export default function AwaitedApp() {
   const [adminPwError, setAdminPwError] = useState(false);
   const [adminTab, setAdminTab] = useState("moderation");
   const [newVerified, setNewVerified] = useState("");
+
+  const results = appData.results;
+  const manualVerifiedList = appData.verifiedList;
+  const customScholarships = appData.customScholarships || [];
+  const verifiedList = useMemo(
+    () => sortScholarshipNames([...DATABASE_SCHOLARSHIP_NAMES, ...manualVerifiedList]),
+    [manualVerifiedList],
+  );
+
+  useEffect(() => {
+    persistAppData(appData);
+  }, [appData]);
+
+  const setResults = (updater) => {
+    setAppData(prev => ({
+      ...prev,
+      results: typeof updater === "function" ? updater(prev.results) : updater,
+    }));
+  };
+
+  const setVerifiedList = (updater) => {
+    setAppData(prev => ({
+      ...prev,
+      verifiedList: typeof updater === "function" ? updater(prev.verifiedList) : updater,
+    }));
+  };
+
+  const setCustomScholarships = (updater) => {
+    setAppData(prev => ({
+      ...prev,
+      customScholarships: typeof updater === "function" ? updater(prev.customScholarships || []) : updater,
+    }));
+  };
+
+  const isVerifiedScholarship = (name) => isDatabaseScholarship(name) || Boolean(findMatchingScholarshipName(name, manualVerifiedList));
+
+  const addManualVerifiedScholarship = (name) => {
+    const canonicalName = getCanonicalScholarshipName(name);
+    const matchedName =
+      findMatchingScholarshipName(canonicalName, [...manualVerifiedList, ...customScholarships]) ||
+      findMatchingScholarshipName(name, [...manualVerifiedList, ...customScholarships]) ||
+      canonicalName;
+
+    if (!matchedName || isDatabaseScholarship(matchedName)) {
+      setNewVerified("");
+      return;
+    }
+
+    setVerifiedList((prev) =>
+      findMatchingScholarshipName(matchedName, prev) ? prev : sortScholarshipNames([...prev, matchedName]),
+    );
+    setCustomScholarships((prev) =>
+      findMatchingScholarshipName(matchedName, prev) ? prev : sortScholarshipNames([...prev, matchedName]),
+    );
+    setNewVerified("");
+  };
 
   const visibleResults = useMemo(() => results.filter(r => !r.hidden || isAdmin), [results, isAdmin]);
 
@@ -106,12 +138,22 @@ export default function AwaitedApp() {
     const entries = visibleResults.filter(r => r.scholarship === selectedScholarship);
     const statusCounts = {};
     STATUSES.forEach(s => statusCounts[s] = entries.filter(r => r.status === s).length);
-    return { entries, statusCounts, name: selectedScholarship };
+    return { entries, statusCounts, name: selectedScholarship, record: getScholarshipRecord(selectedScholarship) };
   }, [selectedScholarship, visibleResults]);
 
   const handleSubmit = (entry) => {
-    const newEntry = { ...entry, id: Date.now(), comments: [], hidden: false, createdAt: new Date().toISOString() };
+    const canonicalName = getCanonicalScholarshipName(entry.scholarship);
+    const matchedName =
+      findMatchingScholarshipName(canonicalName, [...manualVerifiedList, ...customScholarships]) ||
+      findMatchingScholarshipName(entry.scholarship, [...manualVerifiedList, ...customScholarships]) ||
+      canonicalName;
+    const newEntry = { ...entry, scholarship: matchedName, id: Date.now(), comments: [], hidden: false, createdAt: new Date().toISOString() };
     setResults(prev => [newEntry, ...prev]);
+    if (!isDatabaseScholarship(matchedName)) {
+      setCustomScholarships((prev) =>
+        findMatchingScholarshipName(matchedName, prev) ? prev : sortScholarshipNames([...prev, matchedName]),
+      );
+    }
     setView("feed");
     setShowSuccess(true);
     setTimeout(() => setShowSuccess(false), 3000);
@@ -133,11 +175,10 @@ export default function AwaitedApp() {
   };
 
   const handleAddVerified = () => {
-    const name = newVerified.trim();
-    if (name && !verifiedList.includes(name)) { setVerifiedList(prev => [...prev, name].sort()); setNewVerified(""); }
+    addManualVerifiedScholarship(newVerified.trim());
   };
 
-  const handleRemoveVerified = (name) => setVerifiedList(prev => prev.filter(v => v !== name));
+  const handleRemoveVerified = (name) => setVerifiedList(prev => removeScholarshipName(prev, name));
 
   const openScholarship = (name) => { setSelectedScholarship(name); setView("scholarship"); };
   const goFeed = () => { setView("feed"); setSelectedScholarship(null); };
@@ -176,6 +217,13 @@ export default function AwaitedApp() {
         <div style={{ background: "rgba(99,102,241,0.1)", borderBottom: "1px solid rgba(99,102,241,0.2)", padding: "8px 28px", fontSize: 12, color: "#A5B4FC", display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#6366F1" }} />
           Admin mode active — hidden items visible with reduced opacity. Manage content from the Admin panel.
+        </div>
+      )}
+
+      {PERSISTENCE_MODE === "browser-local" && (
+        <div style={{ background: "rgba(217,119,6,0.08)", borderBottom: "1px solid rgba(217,119,6,0.16)", padding: "8px 28px", fontSize: 12, color: "#FBBF24", display: "flex", alignItems: "center", gap: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#F59E0B" }} />
+          Local beta mode active — submissions now survive refreshes in this browser, but shared cross-device persistence still needs a backend.
         </div>
       )}
 
@@ -219,7 +267,7 @@ export default function AwaitedApp() {
               <div>
                 <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>{results.filter(r => r.hidden).length} hidden · {results.length} total submissions</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {results.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(r => (
+                  {[...results].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).map(r => (
                     <div key={r.id} style={{
                       background: r.hidden ? "rgba(220,38,38,0.05)" : "rgba(255,255,255,0.03)",
                       border: `1px solid ${r.hidden ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.06)"}`,
@@ -231,7 +279,7 @@ export default function AwaitedApp() {
                             <span style={{ fontWeight: 600, fontSize: 14, textDecoration: r.hidden ? "line-through" : "none" }}>{r.scholarship}</span>
                             <StatusBadge status={r.status} />
                             {r.hidden && <span style={{ fontSize: 10, color: "#DC2626", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1 }}>Hidden</span>}
-                            {!verifiedList.includes(r.scholarship) && <span style={{ fontSize: 10, color: "#D97706", fontWeight: 500 }}>⚠ Unverified name</span>}
+                            {!isVerifiedScholarship(r.scholarship) && <span style={{ fontSize: 10, color: "#D97706", fontWeight: 500 }}>⚠ Unverified name</span>}
                           </div>
                           <div style={{ fontSize: 12, color: "#64748B" }}>{r.country} · {r.level} · {r.field} {r.nationality ? `· ${r.nationality}` : ""} · {r.date}</div>
                           {r.note && <div style={{ fontSize: 12, color: "#94A3B8", marginTop: 6, lineHeight: 1.5 }}>{r.note}</div>}
@@ -265,7 +313,7 @@ export default function AwaitedApp() {
                   <AnalyticsCard label="Visible Results" value={analytics.totalVisible} color="#38BDF8" />
                   <AnalyticsCard label="Hidden / Spam" value={analytics.hiddenCount} color="#DC2626" />
                   <AnalyticsCard label="Total Comments" value={analytics.totalComments} color="#818CF8" />
-                  <AnalyticsCard label="Verified Names" value={verifiedList.length} color="#059669" />
+                  <AnalyticsCard label="Catalog + Verified" value={verifiedList.length} color="#059669" />
                 </div>
 
                 <div style={panelStyle}>
@@ -292,7 +340,7 @@ export default function AwaitedApp() {
                     return (
                       <div key={name} style={{ marginBottom: 10 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 4 }}>
-                          <span style={{ color: "#E2E8F0", fontWeight: 500 }}>{verifiedList.includes(name) ? "✓ " : "⚠ "}{name}</span>
+                          <span style={{ color: "#E2E8F0", fontWeight: 500 }}>{isVerifiedScholarship(name) ? "✓ " : "⚠ "}{name}</span>
                           <span style={{ color: "#64748B" }}>{count}</span>
                         </div>
                         <div style={{ height: 6, borderRadius: 3, background: "rgba(255,255,255,0.05)", overflow: "hidden" }}>
@@ -346,36 +394,70 @@ export default function AwaitedApp() {
             {adminTab === "scholarships" && (
               <div>
                 <div style={{ ...panelStyle, marginBottom: 16 }}>
-                  <h3 style={panelTitle}>Verified Scholarship List</h3>
-                  <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>These names appear as verified (✓) across the platform. Submissions with names not on this list are flagged as unverified (⚠) in moderation.</p>
+                  <h3 style={panelTitle}>Scholarship Catalog</h3>
+                  <p style={{ fontSize: 12, color: "#64748B", marginBottom: 16 }}>
+                    Awaited now uses your imported scholarship database as the official catalog. Community-added names can still be submitted, and admins can manually verify them here.
+                  </p>
                   <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-                    <input type="text" value={newVerified} onChange={e => setNewVerified(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddVerified()} placeholder="Add a scholarship name..." style={{ ...inputStyle, flex: 1 }} />
+                    <input type="text" value={newVerified} onChange={e => setNewVerified(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddVerified()} placeholder="Manually verify a community-added scholarship..." style={{ ...inputStyle, flex: 1 }} />
                     <button onClick={handleAddVerified} disabled={!newVerified.trim()} style={{
                       padding: "10px 20px", borderRadius: 10, border: "none",
                       background: newVerified.trim() ? "linear-gradient(135deg, #6366F1, #818CF8)" : "rgba(255,255,255,0.05)",
                       color: newVerified.trim() ? "#fff" : "#475569", fontSize: 13, fontWeight: 600, cursor: newVerified.trim() ? "pointer" : "default",
                     }}>Add</button>
                   </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                    <span style={{ fontSize: 12, color: "#38BDF8" }}>{DATABASE_SCHOLARSHIP_NAMES.length} database scholarships</span>
+                    <span style={{ fontSize: 12, color: "#A78BFA" }}>{manualVerifiedList.length} manual verified names</span>
+                    <span style={{ fontSize: 12, color: "#F59E0B" }}>{customScholarships.length} community-added names</span>
+                  </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {verifiedList.map(name => {
                       const count = results.filter(r => r.scholarship === name && !r.hidden).length;
+                      const databaseBacked = isDatabaseScholarship(name);
                       return (
                         <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                             <span style={{ color: "#059669", fontSize: 12 }}>✓</span>
                             <span style={{ fontSize: 13, color: "#E2E8F0" }}>{name}</span>
+                            <span style={{ fontSize: 10, color: databaseBacked ? "#38BDF8" : "#A78BFA", textTransform: "uppercase", letterSpacing: 0.8 }}>
+                              {databaseBacked ? "Database" : "Manual"}
+                            </span>
                             <span style={{ fontSize: 11, color: "#475569" }}>({count} reports)</span>
                           </div>
-                          <button onClick={() => handleRemoveVerified(name)} style={{ background: "none", border: "none", color: "#DC2626", fontSize: 11, cursor: "pointer", opacity: 0.5, padding: "4px 8px" }}
-                            onMouseOver={e => e.target.style.opacity = 1} onMouseOut={e => e.target.style.opacity = 0.5}>Remove</button>
+                          {!databaseBacked && (
+                            <button onClick={() => handleRemoveVerified(name)} style={{ background: "none", border: "none", color: "#DC2626", fontSize: 11, cursor: "pointer", opacity: 0.5, padding: "4px 8px" }}
+                              onMouseOver={e => e.target.style.opacity = 1} onMouseOut={e => e.target.style.opacity = 0.5}>Remove</button>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
 
+                {customScholarships.length > 0 && (
+                  <div style={{ ...panelStyle, marginBottom: 16 }}>
+                    <h3 style={panelTitle}>Community-added Scholarships</h3>
+                    <p style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
+                      These names were submitted by users even though they are not in the imported database. They stay available in autocomplete and scholarship pages.
+                    </p>
+                    {customScholarships.map((name) => (
+                      <div key={name} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: 8, background: "rgba(245,158,11,0.05)", border: "1px solid rgba(245,158,11,0.1)", marginBottom: 6, gap: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                          <span style={{ color: "#F59E0B", fontSize: 11 }}>⊕</span>
+                          <span style={{ fontSize: 13, color: "#E2E8F0" }}>{name}</span>
+                          {isVerifiedScholarship(name) && <span style={{ fontSize: 10, color: "#A78BFA", textTransform: "uppercase", letterSpacing: 0.8 }}>Verified</span>}
+                        </div>
+                        {!isVerifiedScholarship(name) && (
+                          <AdminBtn onClick={() => addManualVerifiedScholarship(name)} color="#059669" small>Verify Name</AdminBtn>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {(() => {
-                  const unverified = results.filter(r => !verifiedList.includes(r.scholarship) && !r.hidden);
+                  const unverified = results.filter(r => !isVerifiedScholarship(r.scholarship) && !r.hidden);
                   if (unverified.length === 0) return null;
                   return (
                     <div style={panelStyle}>
@@ -388,7 +470,7 @@ export default function AwaitedApp() {
                             <span style={{ fontSize: 12, color: "#64748B", marginLeft: 8 }}>{r.country} · {r.level}</span>
                           </div>
                           <div style={{ display: "flex", gap: 4 }}>
-                            <AdminBtn onClick={() => setVerifiedList(prev => [...prev, r.scholarship].sort())} color="#059669" small>Verify Name</AdminBtn>
+                            <AdminBtn onClick={() => addManualVerifiedScholarship(r.scholarship)} color="#059669" small>Verify Name</AdminBtn>
                             <AdminBtn onClick={() => handleToggleHide(r.id)} color="#D97706" small>Hide</AdminBtn>
                           </div>
                         </div>
@@ -426,7 +508,7 @@ export default function AwaitedApp() {
                   <button key={s} onClick={() => openScholarship(s)} style={{ padding: "6px 14px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.1)", background: "rgba(255,255,255,0.04)", color: "#94A3B8", fontSize: 12, fontWeight: 500, cursor: "pointer", transition: "all 0.2s", display: "flex", alignItems: "center", gap: 4 }}
                     onMouseOver={e => { e.currentTarget.style.background = "rgba(129,140,248,0.15)"; e.currentTarget.style.color = "#A5B4FC"; }}
                     onMouseOut={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "#94A3B8"; }}>
-                    {verifiedList.includes(s) && <span style={{ color: "#059669", fontSize: 10 }}>✓</span>}
+                    {isVerifiedScholarship(s) && <span style={{ color: "#059669", fontSize: 10 }}>✓</span>}
                     {s} ({count})
                   </button>
                 );
@@ -443,7 +525,7 @@ export default function AwaitedApp() {
                 {filtered.map(r => (
                   <ResultCard key={r.id} result={r} expanded={expandedCard === r.id} onToggle={() => setExpandedCard(expandedCard === r.id ? null : r.id)} onScholarshipClick={openScholarship}
                     commentText={newComments[r.id] || ""} onCommentChange={(val) => setNewComments(prev => ({ ...prev, [r.id]: val }))} onCommentSubmit={(text) => handleAddComment(r.id, text)}
-                    isAdmin={isAdmin} onToggleHide={() => handleToggleHide(r.id)} onDelete={() => handleDelete(r.id)} verified={verifiedList.includes(r.scholarship)} />
+                    isAdmin={isAdmin} onToggleHide={() => handleToggleHide(r.id)} onDelete={() => handleDelete(r.id)} verified={isVerifiedScholarship(r.scholarship)} />
                 ))}
               </div>
             )}
@@ -451,12 +533,19 @@ export default function AwaitedApp() {
           </>
         )}
 
-        {view === "submit" && <SubmitForm onSubmit={handleSubmit} onCancel={goFeed} verifiedList={verifiedList} />}
+        {view === "submit" && (
+          <SubmitForm
+            onSubmit={handleSubmit}
+            onCancel={goFeed}
+            verifiedScholarships={verifiedList}
+            customScholarships={customScholarships}
+          />
+        )}
 
         {view === "scholarship" && scholarshipData && (
           <ScholarshipView data={scholarshipData} onBack={goFeed} expandedCard={expandedCard} setExpandedCard={setExpandedCard}
             newComments={newComments} setNewComments={setNewComments} onCommentSubmit={handleAddComment}
-            isAdmin={isAdmin} onToggleHide={handleToggleHide} onDelete={handleDelete} verified={verifiedList.includes(scholarshipData.name)} />
+            isAdmin={isAdmin} onToggleHide={handleToggleHide} onDelete={handleDelete} verified={isVerifiedScholarship(scholarshipData.name)} />
         )}
       </main>
 
@@ -587,7 +676,7 @@ function ResultCard({ result: r, expanded, onToggle, onScholarshipClick, comment
           <div>
             <div style={{ fontSize: 12, fontWeight: 600, color: "#64748B", marginBottom: 10, textTransform: "uppercase", letterSpacing: 1 }}>Discussion ({r.comments.length})</div>
             {r.comments.map((c, i) => (
-              <div key={i} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
+              <div key={`${c.time}-${i}`} style={{ padding: "8px 12px", background: "rgba(255,255,255,0.02)", borderRadius: 8, marginBottom: 6, fontSize: 13, color: "#94A3B8" }}>
                 <span style={{ color: "#64748B", fontSize: 11 }}>Anonymous · {c.time}</span>
                 <div style={{ marginTop: 4 }}>{c.text}</div>
               </div>
@@ -609,18 +698,21 @@ function ResultCard({ result: r, expanded, onToggle, onScholarshipClick, comment
   );
 }
 
-function SubmitForm({ onSubmit, onCancel, verifiedList }) {
+function SubmitForm({ onSubmit, onCancel, verifiedScholarships, customScholarships }) {
   const [form, setForm] = useState({
     scholarship: "", country: "", level: "Masters", field: "", status: "Applied",
     date: new Date().toISOString().split("T")[0], nationality: "", gpa: "", note: "",
   });
   const [suggestions, setSuggestions] = useState([]);
+  const trimmedScholarship = form.scholarship.trim();
+  const exactKnownMatch = findMatchingScholarshipName(trimmedScholarship, [...verifiedScholarships, ...customScholarships]);
+  const exactDatabaseMatch = isDatabaseScholarship(trimmedScholarship);
 
   const set = (key) => (e) => {
     const val = e.target.value;
     setForm(prev => ({ ...prev, [key]: val }));
     if (key === "scholarship" && val.length > 0) {
-      setSuggestions(verifiedList.filter(v => v.toLowerCase().includes(val.toLowerCase())).slice(0, 5));
+      setSuggestions(buildScholarshipSuggestions(val, { verifiedScholarships, customScholarships }));
     } else if (key === "scholarship") { setSuggestions([]); }
   };
 
@@ -631,7 +723,7 @@ function SubmitForm({ onSubmit, onCancel, verifiedList }) {
       <button onClick={onCancel} style={{ background: "none", border: "none", color: "#64748B", fontSize: 13, cursor: "pointer", marginBottom: 16, padding: 0 }}>← Back to results</button>
       <div style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 16, padding: 32 }}>
         <h2 style={{ fontFamily: "'Playfair Display', serif", fontSize: 24, fontWeight: 700, marginBottom: 4, color: "#E2E8F0" }}>Submit Your Result</h2>
-        <p style={{ color: "#64748B", fontSize: 13, marginBottom: 28 }}>100% anonymous. Share only what you're comfortable with.</p>
+        <p style={{ color: "#64748B", fontSize: 13, marginBottom: 28 }}>100% anonymous. We use your imported scholarship database for suggestions, but users can still submit scholarships outside that list.</p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <FormField label="Scholarship Name *">
@@ -640,18 +732,32 @@ function SubmitForm({ onSubmit, onCancel, verifiedList }) {
               {suggestions.length > 0 && (
                 <div style={{ position: "absolute", top: "100%", left: 0, right: 0, zIndex: 10, background: "#1E293B", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, marginTop: 4, overflow: "hidden" }}>
                   {suggestions.map(s => (
-                    <div key={s} onClick={() => { setForm(prev => ({ ...prev, scholarship: s })); setSuggestions([]); }}
-                      style={{ padding: "8px 14px", fontSize: 13, color: "#E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}
+                    <div key={`${s.source}-${s.name}`} onClick={() => { setForm(prev => ({ ...prev, scholarship: s.name })); setSuggestions([]); }}
+                      style={{ padding: "8px 14px", fontSize: 13, color: "#E2E8F0", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
                       onMouseOver={e => e.currentTarget.style.background = "rgba(99,102,241,0.15)"}
                       onMouseOut={e => e.currentTarget.style.background = "transparent"}>
-                      <span style={{ color: "#059669", fontSize: 11 }}>✓</span> {s}
+                      <span style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+                        <span style={{ color: s.source === "database" || s.source === "verified" ? "#059669" : "#F59E0B", fontSize: 11 }}>
+                          {s.source === "community" ? "⊕" : "✓"}
+                        </span>
+                        <span>{s.name}</span>
+                      </span>
+                      <span style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8, flexShrink: 0 }}>
+                        {s.source === "database" ? "DB" : s.source === "verified" ? "Verified" : "Community"}
+                      </span>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            {form.scholarship.trim() && !verifiedList.includes(form.scholarship.trim()) && suggestions.length === 0 && (
-              <div style={{ fontSize: 11, color: "#D97706", marginTop: 4 }}>⚠ This name isn't in our verified list yet — double-check spelling</div>
+            {trimmedScholarship && exactDatabaseMatch && (
+              <div style={{ fontSize: 11, color: "#059669", marginTop: 4 }}>✓ Matched to the imported scholarship database</div>
+            )}
+            {trimmedScholarship && !exactDatabaseMatch && exactKnownMatch && (
+              <div style={{ fontSize: 11, color: "#A78BFA", marginTop: 4 }}>✓ Known community/manual scholarship name</div>
+            )}
+            {trimmedScholarship && !exactKnownMatch && suggestions.length === 0 && (
+              <div style={{ fontSize: 11, color: "#D97706", marginTop: 4 }}>⚠ Not in the imported database yet. Users can still submit it and it will be added as a community scholarship.</div>
             )}
           </FormField>
 
@@ -730,7 +836,7 @@ const panelStyle = {
 const panelTitle = { fontSize: 14, fontWeight: 700, color: "#E2E8F0", marginBottom: 14, marginTop: 0 };
 
 function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComments, setNewComments, onCommentSubmit, isAdmin, onToggleHide, onDelete, verified }) {
-  const { entries, statusCounts, name } = data;
+  const { entries, statusCounts, name, record } = data;
   const total = entries.length;
 
   return (
@@ -755,13 +861,45 @@ function ScholarshipView({ data, onBack, expandedCard, setExpandedCard, newComme
           <div style={{ marginLeft: "auto", fontSize: 13, color: "#64748B" }}>{total} reports</div>
         </div>
       </div>
+      {record && (
+        <div style={{ ...panelStyle, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+            <MetadataItem label="Country" value={record.country} />
+            <MetadataItem label="Funder" value={record.funder} />
+            <MetadataItem label="Funding Type" value={record.type} />
+            <MetadataItem label="Typical Deadline" value={record.typical_deadline} />
+            <MetadataItem label="Results Timeline" value={record.results_timeline} />
+            <MetadataItem label="Levels" value={record.levels?.join(", ")} />
+          </div>
+          {record.description && <p style={{ color: "#94A3B8", fontSize: 13, lineHeight: 1.6, marginBottom: 10 }}>{record.description}</p>}
+          {record.eligibility_notes && <p style={{ color: "#64748B", fontSize: 12, lineHeight: 1.6, marginBottom: 12 }}>{record.eligibility_notes}</p>}
+          {record.website && (
+            <a href={record.website} target="_blank" rel="noreferrer" style={{ color: "#38BDF8", fontSize: 13, textDecoration: "none" }}>
+              Visit official scholarship website →
+            </a>
+          )}
+        </div>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {entries.sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => (
+        {[...entries].sort((a, b) => new Date(b.date) - new Date(a.date)).map(r => (
           <ResultCard key={r.id} result={r} expanded={expandedCard === r.id} onToggle={() => setExpandedCard(expandedCard === r.id ? null : r.id)} onScholarshipClick={() => {}}
             commentText={newComments[r.id] || ""} onCommentChange={(val) => setNewComments(prev => ({ ...prev, [r.id]: val }))} onCommentSubmit={(text) => onCommentSubmit(r.id, text)}
             isAdmin={isAdmin} onToggleHide={() => onToggleHide(r.id)} onDelete={() => onDelete(r.id)} verified={verified} />
         ))}
       </div>
+    </div>
+  );
+}
+
+function MetadataItem({ label, value }) {
+  if (!value) {
+    return null;
+  }
+
+  return (
+    <div style={{ padding: "10px 12px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)" }}>
+      <div style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 13, color: "#E2E8F0", lineHeight: 1.5 }}>{value}</div>
     </div>
   );
 }

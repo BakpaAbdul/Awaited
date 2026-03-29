@@ -71,11 +71,10 @@ export function sanitizeSubmission(entry = {}) {
   };
 
   ensureRequired(sanitized.scholarship, "Scholarship name");
-  ensureRequired(sanitized.cycleYear, "Cycle year");
   ensureRequired(sanitized.country, "Country");
-  ensureRequired(sanitized.field, "Field of study");
+  ensureRequired(sanitized.status, "Status");
 
-  if (!LEVELS.includes(sanitized.level)) {
+  if (sanitized.level && !LEVELS.includes(sanitized.level)) {
     throw new Error("Study level is invalid.");
   }
 

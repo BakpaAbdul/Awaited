@@ -329,10 +329,10 @@ async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<s
   const note = cleanText(entry.note);
 
   ensure(scholarshipName, "Scholarship name", 160);
-  ensure(cycleYear, "Cycle year", 32);
+  ensureOptional(cycleYear, "Cycle year", 32);
   ensure(country, "Country", 120);
-  ensure(studyLevel, "Study level", 40);
-  ensure(fieldOfStudy, "Field of study", 160);
+  ensureOptional(studyLevel, "Study level", 40);
+  ensureOptional(fieldOfStudy, "Field of study", 160);
   ensure(status, "Status", 40);
   ensureDateValue(decisionDate, "Latest update date", { required: true });
   ensureOptional(hostUniversity, "University", 160);
@@ -373,10 +373,10 @@ async function handleSubmitResult(entry: Record<string, unknown>, meta: Record<s
 
   const { error } = await adminClient.from("scholarship_results").insert({
     scholarship_name: scholarshipName,
-    cycle_year: cycleYear,
+    cycle_year: cycleYear || null,
     country,
-    study_level: studyLevel,
-    field_of_study: fieldOfStudy,
+    study_level: studyLevel || null,
+    field_of_study: fieldOfStudy || null,
     host_university: hostUniversity || null,
     program_name: programName || null,
     application_round: applicationRound || null,

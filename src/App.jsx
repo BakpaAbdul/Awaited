@@ -1677,12 +1677,12 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
     scholarship: "",
     cycleYear: String(new Date().getFullYear()),
     country: "",
-    level: "Masters",
+    level: "",
     field: "",
     university: "",
     program: "",
     applicationRound: "",
-    status: "Applied",
+    status: "",
     date: new Date().toISOString().split("T")[0],
     appliedDate: "",
     interviewDate: "",
@@ -1695,6 +1695,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
   const [honeypot, setHoneypot] = useState("");
   const [captchaToken, setCaptchaToken] = useState("");
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const [showMoreDetails, setShowMoreDetails] = useState(false);
   const requiresCaptcha = turnstileSiteKey && !hasStoredHumanTrust();
   const trimmedScholarship = form.scholarship.trim();
   const exactKnownMatch = findMatchingScholarshipName(trimmedScholarship, [...verifiedScholarships, ...customScholarships]);
@@ -1710,7 +1711,7 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
     }
   };
 
-  const valid = form.scholarship.trim() && form.cycleYear.trim() && form.country.trim() && form.field.trim() && (!requiresCaptcha || captchaToken);
+  const valid = form.scholarship.trim() && form.country.trim() && form.status.trim() && form.date && (!requiresCaptcha || captchaToken);
 
   const handleSubmit = async () => {
     if (!valid) {
@@ -1734,6 +1735,9 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
           Anonymous results now go through throttling and moderation. Known scholarships can publish immediately; risky or unknown reports can land in the review queue first.
         </p>
         <TrustNotice compact onNavigate={onNavigate} />
+        <div style={{ fontSize: 12, color: THEME.textSoft, marginBottom: 18 }}>
+          Required: scholarship name, country, status, and latest update date. Everything else is optional.
+        </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <FormField label="Scholarship Name *">
@@ -1764,78 +1768,100 @@ function SubmitForm({ onSubmit, onCancel, onNavigate, verifiedScholarships, cust
           </FormField>
 
           <div style={{ display: "flex", gap: 12 }}>
-            <FormField label="Cycle Year *" style={{ flex: 1 }}>
-              <input value={form.cycleYear} onChange={set("cycleYear")} placeholder="e.g. 2026 or 2026/27" style={inputStyle} />
-            </FormField>
             <FormField label="Country *" style={{ flex: 1 }}>
               <input value={form.country} onChange={set("country")} placeholder="e.g. United Kingdom" style={inputStyle} />
             </FormField>
-          </div>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <FormField label="Study Level *" style={{ flex: 1 }}>
-              <select value={form.level} onChange={set("level")} style={inputStyle}>
-                {LEVELS.map((level) => <option key={level} value={level} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{level}</option>)}
-              </select>
-            </FormField>
-            <FormField label="Application Round" style={{ flex: 1 }}>
-              <input value={form.applicationRound} onChange={set("applicationRound")} placeholder="e.g. Round 1, Embassy track" style={inputStyle} />
-            </FormField>
-          </div>
-
-          <div style={{ display: "flex", gap: 12 }}>
-            <FormField label="Field of Study *" style={{ flex: 1 }}>
-              <input value={form.field} onChange={set("field")} placeholder="e.g. Economics, Engineering..." style={inputStyle} />
-            </FormField>
             <FormField label="Status *" style={{ flex: 1 }}>
               <select value={form.status} onChange={set("status")} style={inputStyle}>
+                <option value="" style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>Select status</option>
                 {STATUSES.map((status) => <option key={status} value={status} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{status}</option>)}
               </select>
             </FormField>
           </div>
 
           <div style={{ display: "flex", gap: 12 }}>
-            <FormField label="University / Host Institution" style={{ flex: 1 }}>
-              <input value={form.university} onChange={set("university")} placeholder="e.g. University of Oxford" style={inputStyle} />
+            <FormField label="Latest Update Date *" style={{ flex: 1 }}>
+              <input type="date" value={form.date} onChange={set("date")} style={inputStyle} />
             </FormField>
-            <FormField label="Program / Degree" style={{ flex: 1 }}>
-              <input value={form.program} onChange={set("program")} placeholder="e.g. MSc Economics for Development" style={inputStyle} />
+            <FormField label="Cycle Year" style={{ flex: 1 }}>
+              <input value={form.cycleYear} onChange={set("cycleYear")} placeholder="e.g. 2026 or 2026/27" style={inputStyle} />
             </FormField>
           </div>
 
-          <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, paddingTop: 16, marginTop: 4 }}>
-            <p style={{ color: THEME.textSoft, fontSize: 12, marginBottom: 12 }}>Timeline details make the feed much more useful for other applicants.</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-              <FormField label="Applied Date">
-                <input type="date" value={form.appliedDate} onChange={set("appliedDate")} style={inputStyle} />
-              </FormField>
-              <FormField label="Interview Date">
-                <input type="date" value={form.interviewDate} onChange={set("interviewDate")} style={inputStyle} />
-              </FormField>
-              <FormField label="Latest Update Date *">
-                <input type="date" value={form.date} onChange={set("date")} style={inputStyle} />
-              </FormField>
-              <FormField label="Final Decision Date">
-                <input type="date" value={form.finalDecisionDate} onChange={set("finalDecisionDate")} style={inputStyle} />
-              </FormField>
+          <div style={{ display: "flex", gap: 12 }}>
+            <FormField label="Study Level" style={{ flex: 1 }}>
+              <select value={form.level} onChange={set("level")} style={inputStyle}>
+                <option value="" style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>Optional</option>
+                {LEVELS.map((level) => <option key={level} value={level} style={{ background: THEME.panelBackgroundStrong, color: THEME.textPrimary }}>{level}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Field of Study" style={{ flex: 1 }}>
+              <input value={form.field} onChange={set("field")} placeholder="e.g. Economics, Engineering..." style={inputStyle} />
+            </FormField>
+          </div>
+
+          <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, paddingTop: 14, marginTop: 2 }}>
+            <button
+              type="button"
+              onClick={() => setShowMoreDetails((current) => !current)}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                color: THEME.accentText,
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: "pointer",
+              }}
+            >
+              {showMoreDetails ? "Hide extra details" : "Add more details"}
+            </button>
+            <div style={{ color: THEME.textSoft, fontSize: 12, marginTop: 6 }}>
+              Optional timeline, profile, and application-context fields for people who want to be more specific.
             </div>
           </div>
 
-          <div style={{ borderTop: `1px solid ${THEME.panelBorderSoft}`, paddingTop: 16, marginTop: 4 }}>
-            <p style={{ color: THEME.textSoft, fontSize: 12, marginBottom: 12 }}>Optional — share only what you want</p>
-            <div style={{ display: "flex", gap: 12 }}>
-              <FormField label="Nationality" style={{ flex: 1 }}>
-                <input value={form.nationality} onChange={set("nationality")} placeholder="Optional" style={inputStyle} />
+          {showMoreDetails && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", gap: 12 }}>
+                <FormField label="University / Host Institution" style={{ flex: 1 }}>
+                  <input value={form.university} onChange={set("university")} placeholder="e.g. University of Oxford" style={inputStyle} />
+                </FormField>
+                <FormField label="Application Round" style={{ flex: 1 }}>
+                  <input value={form.applicationRound} onChange={set("applicationRound")} placeholder="e.g. Round 1, Embassy track" style={inputStyle} />
+                </FormField>
+              </div>
+
+              <FormField label="Program / Degree">
+                <input value={form.program} onChange={set("program")} placeholder="e.g. MSc Economics for Development" style={inputStyle} />
               </FormField>
-              <FormField label="GPA" style={{ flex: 1 }}>
-                <input value={form.gpa} onChange={set("gpa")} placeholder="Optional" style={inputStyle} />
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
+                <FormField label="Applied Date">
+                  <input type="date" value={form.appliedDate} onChange={set("appliedDate")} style={inputStyle} />
+                </FormField>
+                <FormField label="Interview Date">
+                  <input type="date" value={form.interviewDate} onChange={set("interviewDate")} style={inputStyle} />
+                </FormField>
+                <FormField label="Final Decision Date">
+                  <input type="date" value={form.finalDecisionDate} onChange={set("finalDecisionDate")} style={inputStyle} />
+                </FormField>
+              </div>
+
+              <div style={{ display: "flex", gap: 12 }}>
+                <FormField label="Nationality" style={{ flex: 1 }}>
+                  <input value={form.nationality} onChange={set("nationality")} placeholder="Optional" style={inputStyle} />
+                </FormField>
+                <FormField label="GPA" style={{ flex: 1 }}>
+                  <input value={form.gpa} onChange={set("gpa")} placeholder="Optional" style={inputStyle} />
+                </FormField>
+              </div>
+
+              <FormField label="Notes / Tips">
+                <textarea value={form.note} onChange={set("note")} placeholder="Share your experience, timeline, tips for others..." rows={3} style={{ ...inputStyle, resize: "vertical" }} />
               </FormField>
             </div>
-          </div>
-
-          <FormField label="Notes / Tips">
-            <textarea value={form.note} onChange={set("note")} placeholder="Share your experience, timeline, tips for others..." rows={3} style={{ ...inputStyle, resize: "vertical" }} />
-          </FormField>
+          )}
 
           <input type="text" value={honeypot} onChange={(event) => setHoneypot(event.target.value)} tabIndex={-1} autoComplete="off" style={{ position: "absolute", left: "-9999px", opacity: 0, pointerEvents: "none" }} aria-hidden="true" />
           {requiresCaptcha && <TurnstileGate resetKey={captchaResetKey} onVerify={setCaptchaToken} />}
